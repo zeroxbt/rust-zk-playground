@@ -1,0 +1,33 @@
+# Ignore all target directories in workspace members
+target/
+**/target/
+
+# Rust/Cargo specific
+Cargo.lock
+
+# macOS Finder
+.DS_Store
+
+# VSCode
+.vscode/
+
+# IDEA / CLion
+.idea/
+
+# Logs
+*.log
+
+# ZK tools sometimes generate params
+*.key
+*.pk
+*.vk
+*.params
+*.zkey
+
+# RISC0 / Halo2 build artifacts
+*.r0
+*.proof
+*.json
+
+# Misc temporary files
+*~
