@@ -39,5 +39,5 @@ fn main() {
     };
     let is_valid = prove_and_verify(circuit, &[c]);
 
-    println!("Curve: Bls12_381, circuit: AddOne, valid: {}", is_valid);
+    println!("Curve: Bls12_381, circuit: Mul, valid: {}", is_valid);
 }
