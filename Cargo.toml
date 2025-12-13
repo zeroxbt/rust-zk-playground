@@ -1,3 +1,3 @@
 [workspace]
-members = []
+members = ["01-zk-hello-world"]
 resolver = "2"
