@@ -42,3 +42,63 @@ impl<F: Field> ConstraintSynthesizer<F> for ChainedCircuit<F> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ChainedCircuit;
+    use crate::{Curve, Fr};
+    use ark_groth16::{Groth16, prepare_verifying_key};
+    use ark_std::test_rng;
+
+    fn prove(
+        a: u64,
+        b: u64,
+        c: u64,
+        d: u64,
+    ) -> (
+        Fr,
+        ark_groth16::Proof<Curve>,
+        ark_groth16::PreparedVerifyingKey<Curve>,
+    ) {
+        let mut setup_rng = test_rng();
+        let mut proof_rng = test_rng();
+
+        let params = Groth16::<Curve>::generate_random_parameters_with_reduction(
+            ChainedCircuit {
+                a: None,
+                b: None,
+                c: None,
+                d: None,
+            },
+            &mut setup_rng,
+        )
+        .unwrap();
+        let pvk = prepare_verifying_key(&params.vk);
+
+        let proof = Groth16::<Curve>::create_random_proof_with_reduction(
+            ChainedCircuit {
+                a: Some(Fr::from(a)),
+                b: Some(Fr::from(b)),
+                c: Some(Fr::from(c)),
+                d: Some(Fr::from(d)),
+            },
+            &params,
+            &mut proof_rng,
+        )
+        .unwrap();
+
+        (Fr::from(d), proof, pvk)
+    }
+
+    #[test]
+    fn chained_succeeds() {
+        let (d, proof, pvk) = prove(6, 7, 8, 50);
+        assert!(Groth16::<Curve>::verify_proof(&pvk, &proof, &[d]).unwrap());
+    }
+
+    #[test]
+    fn chained_rejects_wrong_public_input() {
+        let (_d, proof, pvk) = prove(6, 7, 8, 50);
+        assert!(!Groth16::<Curve>::verify_proof(&pvk, &proof, &[Fr::from(49)]).unwrap());
+    }
+}
