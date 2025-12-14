@@ -2,7 +2,7 @@ use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::Pairing;
 use ark_groth16::{Groth16, prepare_verifying_key};
 use ark_std::test_rng;
-use zk_hello_world::circuits::mul::MulCircuit;
+use zk_hello_world::circuits::{chained::ChainedCircuit, mul::MulCircuit};
 
 pub mod circuits;
 
@@ -30,14 +30,16 @@ fn prove_and_verify<C: ark_relations::r1cs::ConstraintSynthesizer<Fr> + Clone>(
 fn main() {
     let a = Fr::from(3u64);
     let b = Fr::from(4u64);
-    let c = a * b;
+    let c = Fr::from(5u64);
+    let d = (a * b) + c;
 
-    let circuit = MulCircuit {
+    let circuit = ChainedCircuit {
         a: Some(a),
         b: Some(b),
         c: Some(c),
+        d: Some(d),
     };
-    let is_valid = prove_and_verify(circuit, &[c]);
+    let is_valid = prove_and_verify(circuit, &[d]);
 
-    println!("Curve: Bls12_381, circuit: Mul, valid: {}", is_valid);
+    println!("Curve: Bls12_381, circuit: Chained, valid: {}", is_valid);
 }
