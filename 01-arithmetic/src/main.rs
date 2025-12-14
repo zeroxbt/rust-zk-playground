@@ -1,6 +1,6 @@
+use arithmetic::{Curve, Fr, circuits::chained::ChainedCircuit};
 use ark_groth16::{Groth16, prepare_verifying_key};
 use ark_std::test_rng;
-use zk_hello_world::{Curve, Fr, circuits::chained::ChainedCircuit};
 
 pub mod circuits;
 
