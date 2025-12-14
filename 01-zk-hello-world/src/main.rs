@@ -2,7 +2,7 @@ use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::Pairing;
 use ark_groth16::{Groth16, prepare_verifying_key};
 use ark_std::test_rng;
-use zk_hello_world::circuits::{chained::ChainedCircuit, mul::MulCircuit};
+use zk_hello_world::circuits::chained::ChainedCircuit;
 
 pub mod circuits;
 
