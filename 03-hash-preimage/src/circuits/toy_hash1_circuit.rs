@@ -1,4 +1,4 @@
-use crate::circuits::toy_hash_gadget::permute_gadget;
+use crate::{circuits::toy_hash_gadget::permute_gadget, toy_hash::spec::DST_HASH1};
 use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 use ark_relations::r1cs::{
@@ -31,7 +31,7 @@ impl ConstraintSynthesizer<Fr> for ToyHash1Circuit {
             self.h.ok_or(SynthesisError::AssignmentMissing)?
         };
         let s0 = x;
-        let s1 = Fr::ZERO;
+        let s1 = DST_HASH1;
         let mut s0_var = cs.new_witness_variable(|| Ok(s0))?;
         let s1_var = cs.new_witness_variable(|| Ok(s1))?;
         let h_var = cs.new_input_variable(|| Ok(h))?;
@@ -39,7 +39,7 @@ impl ConstraintSynthesizer<Fr> for ToyHash1Circuit {
         cs.enforce_constraint(
             LinearCombination::from(s1_var),
             LinearCombination::from(Variable::One),
-            LinearCombination::zero(),
+            LinearCombination::from((s1, Variable::One)),
         )?;
 
         (s0_var, _, _, _) = permute_gadget(&cs, s0_var, s1_var, s0, s1)?;

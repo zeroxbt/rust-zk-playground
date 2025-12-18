@@ -1,4 +1,4 @@
-use crate::toy_hash::spec::{MDS, ROUND_CONSTANTS};
+use crate::toy_hash::spec::{DST_HASH1, DST_HASH2, MDS, ROUND_CONSTANTS};
 use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 
@@ -27,7 +27,7 @@ pub fn permute(mut s0: Fr, mut s1: Fr) -> (Fr, Fr) {
 
 pub fn hash(x: Fr) -> Fr {
     let mut s0 = Fr::ZERO;
-    let s1 = Fr::ZERO;
+    let s1 = DST_HASH1;
 
     // absorb x0
     s0 += x;
@@ -39,7 +39,7 @@ pub fn hash(x: Fr) -> Fr {
 
 pub fn hash2(x0: Fr, x1: Fr) -> Fr {
     let mut s0 = Fr::ZERO;
-    let mut s1 = Fr::ZERO;
+    let mut s1 = DST_HASH2;
 
     // absorb x0
     s0 += x0;
