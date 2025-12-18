@@ -12,7 +12,7 @@ pub const MDS: [[Fr; WIDTH]; WIDTH] = [
     [Fr::ONE, Fr::ONE, Fr::ZERO],
     [Fr::ZERO, Fr::ONE, Fr::ONE],
 ];
-pub const ROUND_CONSTANTS: [[Fr; WIDTH]; FULL_ROUNDS + PARTIAL_ROUNDS] = [
+pub const ARK: [[Fr; WIDTH]; FULL_ROUNDS + PARTIAL_ROUNDS] = [
     [
         MontFp!("9478896780421655835758496955063136571251874317427585180076394551808670301829"),
         MontFp!("1410220424381727336803825453763847584610565307685015130563813219659976870089"),
@@ -205,7 +205,7 @@ pub struct PoseidonSpec {
     pub full_rounds: usize,
     pub partial_rounds: usize,
     pub alpha: u64,
-    pub round_constants: [[Fr; WIDTH]; FULL_ROUNDS + PARTIAL_ROUNDS],
+    pub ark: [[Fr; WIDTH]; FULL_ROUNDS + PARTIAL_ROUNDS],
     pub mds: [[Fr; WIDTH]; WIDTH],
 }
 
@@ -215,7 +215,7 @@ impl Default for PoseidonSpec {
             full_rounds: FULL_ROUNDS,
             partial_rounds: PARTIAL_ROUNDS,
             alpha: ALPHA,
-            round_constants: ROUND_CONSTANTS,
+            ark: ARK,
             mds: MDS,
         }
     }
