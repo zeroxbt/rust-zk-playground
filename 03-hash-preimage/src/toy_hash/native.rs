@@ -2,7 +2,13 @@ use crate::toy_hash::spec::{DST_HASH1, DST_HASH2, MDS, ROUND_CONSTANTS};
 use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 
-pub fn permute(mut s0: Fr, mut s1: Fr) -> (Fr, Fr) {
+pub trait PermutationNative<F, const T: usize> {
+    fn permute_in_place(&self, state: &mut [F; T]);
+}
+
+fn permute(s0: Fr, s1: Fr) -> (Fr, Fr) {
+    let mut s0 = s0;
+    let mut s1 = s1;
     for [c0, c1] in ROUND_CONSTANTS {
         // add round constants
         let u0 = s0 + c0;
