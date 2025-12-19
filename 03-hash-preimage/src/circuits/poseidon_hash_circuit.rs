@@ -18,7 +18,7 @@ pub struct PoseidonHashCircuit {
 }
 
 impl PoseidonHashCircuit {
-    fn new(x: Option<Vec<Fr>>, h: Option<Fr>) -> Self {
+    pub fn new(x: Option<Vec<Fr>>, h: Option<Fr>) -> Self {
         Self { x, h }
     }
 }
