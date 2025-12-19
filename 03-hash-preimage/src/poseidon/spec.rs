@@ -209,14 +209,10 @@ pub struct PoseidonSpec {
     pub mds: [[Fr; WIDTH]; WIDTH],
 }
 
-impl Default for PoseidonSpec {
-    fn default() -> Self {
-        Self {
-            full_rounds: FULL_ROUNDS,
-            partial_rounds: PARTIAL_ROUNDS,
-            alpha: ALPHA,
-            ark: ARK,
-            mds: MDS,
-        }
-    }
-}
+pub const POSEIDON_SPEC: PoseidonSpec = PoseidonSpec {
+    full_rounds: FULL_ROUNDS,
+    partial_rounds: PARTIAL_ROUNDS,
+    alpha: ALPHA,
+    ark: ARK,
+    mds: MDS,
+};
