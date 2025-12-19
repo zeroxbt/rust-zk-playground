@@ -1,9 +1,6 @@
 use crate::{
-    poseidon::{
-        native::PoseidonPermutation,
-        spec::{POSEIDON_SPEC, RATE, WIDTH},
-    },
     sponge::gadget::SpongeGadget,
+    toy_hash::{native::ToyHashPermutation, spec::TOY_HASH_SPEC},
 };
 use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
@@ -12,18 +9,18 @@ use ark_relations::r1cs::{
 };
 
 #[derive(Clone, Debug)]
-pub struct PoseidonHashCircuit {
+pub struct ToyHashCircuit {
     x: Option<Vec<Fr>>, // private
     h: Option<Fr>,      // public
 }
 
-impl PoseidonHashCircuit {
+impl ToyHashCircuit {
     fn new(x: Option<Vec<Fr>>, h: Option<Fr>) -> Self {
         Self { x, h }
     }
 }
 
-impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
+impl ConstraintSynthesizer<Fr> for ToyHashCircuit {
     fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         let setup = cs.is_in_setup_mode();
 
@@ -42,17 +39,12 @@ impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
             self.h.ok_or(SynthesisError::AssignmentMissing)?
         };
 
-        let perm = PoseidonPermutation {
-            spec: &POSEIDON_SPEC,
+        let perm = ToyHashPermutation {
+            spec: &TOY_HASH_SPEC,
         }; // implements PermutationGadget
-        let sponge = SpongeGadget::<_, WIDTH, RATE> { perm };
+        let sponge = SpongeGadget::<_, 2, 1> { perm };
 
-        let out = sponge.hash(
-            &cs,
-            x.as_slice(),
-            /*dst_capacity=*/ None,
-            /*squeeze_lane=*/ 1,
-        )?;
+        let out = sponge.hash(&cs, x.as_slice(), None, 1)?;
 
         let h_var = cs.new_input_variable(|| Ok(h))?;
         cs.enforce_constraint(
@@ -67,41 +59,39 @@ impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
+    use crate::{
+        sponge::native::SpongeNative,
+        toy_hash::{native::ToyHashPermutation, spec::TOY_HASH_SPEC},
+    };
 
     use super::*;
-    use ark_bls12_381::{Bls12_381, Fr};
+    use ark_bls12_381::Bls12_381;
     use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
 
     use ark_relations::r1cs::ConstraintSystem;
     use ark_std::test_rng;
 
-    fn create_circuits() -> (PoseidonHashCircuit, PoseidonHashCircuit) {
+    fn create_circuits() -> (ToyHashCircuit, ToyHashCircuit) {
         let x0 = Fr::from(7u64);
         let x1 = Fr::from(8u64);
-        let sponge = SpongeNative::<_, 3, 2> {
-            perm: PoseidonPermutation {
-                spec: &POSEIDON_SPEC,
+        let sponge = SpongeNative::<_, 2, 1> {
+            perm: ToyHashPermutation {
+                spec: &TOY_HASH_SPEC,
             },
         };
         let h = sponge.hash(&[x0, x1]);
-        let setup_circuit = PoseidonHashCircuit::new(None, None);
-        let prove_circuit = PoseidonHashCircuit::new(Some(vec![x0, x1]), Some(h));
+        let setup_circuit = ToyHashCircuit::new(None, None);
+        let prove_circuit = ToyHashCircuit::new(Some(vec![x0, x1]), Some(h));
 
         (setup_circuit, prove_circuit)
     }
 
-    fn prove(
-        pk: ProvingKey<Bls12_381>,
-        circuit: PoseidonHashCircuit,
-    ) -> ark_groth16::Proof<Bls12_381> {
+    fn prove(pk: ProvingKey<Bls12_381>, circuit: ToyHashCircuit) -> ark_groth16::Proof<Bls12_381> {
         Groth16::<Bls12_381>::create_random_proof_with_reduction(circuit, &pk, &mut test_rng())
             .unwrap()
     }
 
-    fn setup(
-        circuit: PoseidonHashCircuit,
-    ) -> (ProvingKey<Bls12_381>, PreparedVerifyingKey<Bls12_381>) {
+    fn setup(circuit: ToyHashCircuit) -> (ProvingKey<Bls12_381>, PreparedVerifyingKey<Bls12_381>) {
         let mut rng = test_rng();
         let pk = Groth16::<Bls12_381>::generate_random_parameters_with_reduction(circuit, &mut rng)
             .unwrap();
@@ -111,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn poseidon_valid() {
+    fn toy_hash_valid() {
         let (sc, pc) = create_circuits();
         let public_inputs = &[pc.h.unwrap()];
         let (pk, vk) = setup(sc);
@@ -121,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn poseidon_wrong_public() {
+    fn toy_hash_wrong_public() {
         let (sc, pc) = create_circuits();
         let wrong_public_inputs = &[Fr::from(1)];
         let (pk, vk) = setup(sc);
@@ -131,24 +121,24 @@ mod tests {
     }
 
     #[test]
-    fn poseidon_wrong_witnesses() {
+    fn toy_hash_wrong_witnesses() {
         let x0 = Fr::from(7u64);
         let x1 = Fr::from(8u64);
-        let sponge = SpongeNative::<_, 3, 2> {
-            perm: PoseidonPermutation {
-                spec: &POSEIDON_SPEC,
+        let sponge = SpongeNative::<_, 2, 1> {
+            perm: ToyHashPermutation {
+                spec: &TOY_HASH_SPEC,
             },
         };
         let h = sponge.hash(&[x0, x1]);
         let x_wrong = Fr::from(6u64);
 
-        let prove_circuit = PoseidonHashCircuit::new(Some(vec![x_wrong, x1]), Some(h));
+        let prove_circuit = ToyHashCircuit::new(Some(vec![x_wrong, x1]), Some(h));
         let cs = ConstraintSystem::<Fr>::new_ref();
         prove_circuit.generate_constraints(cs.clone()).unwrap();
 
         assert!(!cs.is_satisfied().unwrap());
 
-        let prove_circuit = PoseidonHashCircuit::new(Some(vec![x0, x_wrong]), Some(h));
+        let prove_circuit = ToyHashCircuit::new(Some(vec![x0, x_wrong]), Some(h));
         let cs = ConstraintSystem::<Fr>::new_ref();
         prove_circuit.generate_constraints(cs.clone()).unwrap();
 

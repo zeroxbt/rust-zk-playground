@@ -1,60 +1,30 @@
-use crate::toy_hash::spec::{DST_HASH1, DST_HASH2, MDS, ROUND_CONSTANTS};
+use crate::{sponge::native::PermutationNative, toy_hash::spec::ToyHashSpec};
 use ark_bls12_381::Fr;
-use ark_ff::AdditiveGroup;
+use ark_ff::Field;
 
-pub trait PermutationNative<F, const T: usize> {
-    fn permute_in_place(&self, state: &mut [F; T]);
+pub struct ToyHashPermutation<'a> {
+    pub(crate) spec: &'a ToyHashSpec,
 }
 
-fn permute(s0: Fr, s1: Fr) -> (Fr, Fr) {
-    let mut s0 = s0;
-    let mut s1 = s1;
-    for [c0, c1] in ROUND_CONSTANTS {
-        // add round constants
-        let u0 = s0 + c0;
-        let u1 = s1 + c1;
+impl PermutationNative<2> for ToyHashPermutation<'_> {
+    fn permute_in_place(&self, state: &mut [Fr; 2]) {
+        let mut s0 = state[0];
+        let mut s1 = state[1];
+        for [c0, c1] in self.spec.ark {
+            // add round constants
+            let u0 = s0 + c0;
+            let u1 = s1 + c1;
 
-        // s-box u^5 (mirrors circuit)
-        let u0_2 = u0 * u0;
-        let u0_4 = u0_2 * u0_2;
-        let v0 = u0_4 * u0;
+            // s-box u^alpha
+            let v0 = u0.pow([self.spec.alpha]);
+            let v1 = u1.pow([self.spec.alpha]);
 
-        let u1_2 = u1 * u1;
-        let u1_4 = u1_2 * u1_2;
-        let v1 = u1_4 * u1;
+            // linear mixing
+            s0 = self.spec.mds[0][0] * v0 + self.spec.mds[0][1] * v1;
+            s1 = self.spec.mds[1][0] * v0 + self.spec.mds[1][1] * v1;
+        }
 
-        // linear mixing
-        s0 = MDS[0][0] * v0 + MDS[0][1] * v1;
-        s1 = MDS[1][0] * v0 + MDS[1][1] * v1;
+        state[0] = s0;
+        state[1] = s1;
     }
-
-    (s0, s1)
-}
-
-pub fn hash(x: Fr) -> Fr {
-    let mut s0 = Fr::ZERO;
-    let s1 = DST_HASH1;
-
-    // absorb x0
-    s0 += x;
-    (s0, _) = permute(s0, s1);
-
-    // squeeze
-    s0
-}
-
-pub fn hash2(x0: Fr, x1: Fr) -> Fr {
-    let mut s0 = Fr::ZERO;
-    let mut s1 = DST_HASH2;
-
-    // absorb x0
-    s0 += x0;
-    (s0, s1) = permute(s0, s1);
-
-    // absorb x1
-    s0 += x1;
-    (s0, _) = permute(s0, s1);
-
-    // squeeze
-    s0
 }

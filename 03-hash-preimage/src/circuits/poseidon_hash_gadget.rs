@@ -2,51 +2,47 @@ use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 use ark_relations::r1cs::{ConstraintSystemRef, LinearCombination, SynthesisError, Variable};
 
-use crate::poseidon::spec::{PoseidonSpec, WIDTH};
+use crate::{
+    poseidon::{
+        native::PoseidonPermutation,
+        spec::{PoseidonSpec, WIDTH},
+    },
+    sponge::gadget::{PermutationGadget, State},
+};
 
-#[derive(Clone, Copy, Debug)]
-pub struct State {
-    pub val: Fr,
-    pub var: Variable,
-}
+impl PermutationGadget<3> for PoseidonPermutation<'_> {
+    fn permute_in_place(
+        &self,
+        cs: &ConstraintSystemRef<Fr>,
+        state: &mut [State; 3],
+    ) -> Result<(), SynthesisError> {
+        assert!(self.spec.full_rounds.is_multiple_of(2));
+        assert_eq!(
+            self.spec.ark.len(),
+            self.spec.full_rounds + self.spec.partial_rounds
+        );
 
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            val: Fr::ZERO,
-            var: Variable::Zero,
+        let (first_full, rest) = self.spec.ark.split_at(self.spec.full_rounds / 2);
+        let (partial, last_full) = rest.split_at(self.spec.partial_rounds);
+
+        for rc in first_full {
+            apply_ark(cs, rc, state)?;
+            apply_s_box_17(self.spec, cs, state, true)?;
+            apply_mds(self.spec, cs, state)?;
         }
-    }
-}
+        for rc in partial {
+            apply_ark(cs, rc, state)?;
+            apply_s_box_17(self.spec, cs, state, false)?;
+            apply_mds(self.spec, cs, state)?;
+        }
+        for rc in last_full {
+            apply_ark(cs, rc, state)?;
+            apply_s_box_17(self.spec, cs, state, true)?;
+            apply_mds(self.spec, cs, state)?;
+        }
 
-pub fn permute_gadget(
-    spec: &PoseidonSpec,
-    cs: &ConstraintSystemRef<Fr>,
-    state: &mut [State; WIDTH],
-) -> Result<(), SynthesisError> {
-    assert!(spec.full_rounds.is_multiple_of(2));
-    assert_eq!(spec.ark.len(), spec.full_rounds + spec.partial_rounds);
-
-    let (first_full, rest) = spec.ark.split_at(spec.full_rounds / 2);
-    let (partial, last_full) = rest.split_at(spec.partial_rounds);
-
-    for rc in first_full {
-        apply_ark(cs, rc, state)?;
-        apply_s_box_17(spec, cs, state, true)?;
-        apply_mds(spec, cs, state)?;
+        Ok(())
     }
-    for rc in partial {
-        apply_ark(cs, rc, state)?;
-        apply_s_box_17(spec, cs, state, false)?;
-        apply_mds(spec, cs, state)?;
-    }
-    for rc in last_full {
-        apply_ark(cs, rc, state)?;
-        apply_s_box_17(spec, cs, state, true)?;
-        apply_mds(spec, cs, state)?;
-    }
-
-    Ok(())
 }
 
 fn apply_ark(
