@@ -1,7 +1,7 @@
 use crate::{
     poseidon::{
         native::PoseidonPermutation,
-        spec::{POSEIDON_SPEC, RATE, WIDTH},
+        spec::{RATE, WIDTH},
     },
     sponge::gadget::SpongeGadget,
 };
@@ -42,17 +42,10 @@ impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
             self.h.ok_or(SynthesisError::AssignmentMissing)?
         };
 
-        let perm = PoseidonPermutation {
-            spec: &POSEIDON_SPEC,
-        }; // implements PermutationGadget
+        let perm = PoseidonPermutation::default();
         let sponge = SpongeGadget::<_, WIDTH, RATE> { perm };
 
-        let out = sponge.hash(
-            &cs,
-            x.as_slice(),
-            /*dst_capacity=*/ None,
-            /*squeeze_lane=*/ 1,
-        )?;
+        let out = sponge.hash(&cs, x.as_slice(), /*squeeze_lane=*/ 1)?;
 
         let h_var = cs.new_input_variable(|| Ok(h))?;
         cs.enforce_constraint(
@@ -79,11 +72,7 @@ mod tests {
     fn create_circuits() -> (PoseidonHashCircuit, PoseidonHashCircuit) {
         let x0 = Fr::from(7u64);
         let x1 = Fr::from(8u64);
-        let sponge = SpongeNative::<_, 3, 2> {
-            perm: PoseidonPermutation {
-                spec: &POSEIDON_SPEC,
-            },
-        };
+        let sponge: SpongeNative<PoseidonPermutation, 3, 2> = SpongeNative::default();
         let h = sponge.hash(&[x0, x1]);
         let setup_circuit = PoseidonHashCircuit::new(None, None);
         let prove_circuit = PoseidonHashCircuit::new(Some(vec![x0, x1]), Some(h));
@@ -134,11 +123,7 @@ mod tests {
     fn poseidon_wrong_witnesses() {
         let x0 = Fr::from(7u64);
         let x1 = Fr::from(8u64);
-        let sponge = SpongeNative::<_, 3, 2> {
-            perm: PoseidonPermutation {
-                spec: &POSEIDON_SPEC,
-            },
-        };
+        let sponge: SpongeNative<PoseidonPermutation, 3, 2> = SpongeNative::default();
         let h = sponge.hash(&[x0, x1]);
         let x_wrong = Fr::from(6u64);
 

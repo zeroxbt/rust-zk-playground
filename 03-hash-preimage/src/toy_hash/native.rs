@@ -1,9 +1,20 @@
-use crate::{sponge::native::PermutationNative, toy_hash::spec::ToyHashSpec};
+use crate::{
+    sponge::native::PermutationNative,
+    toy_hash::spec::{TOY_HASH_SPEC, ToyHashSpec},
+};
 use ark_bls12_381::Fr;
 use ark_ff::Field;
 
 pub struct ToyHashPermutation<'a> {
     pub(crate) spec: &'a ToyHashSpec,
+}
+
+impl Default for ToyHashPermutation<'_> {
+    fn default() -> Self {
+        Self {
+            spec: &TOY_HASH_SPEC,
+        }
+    }
 }
 
 impl PermutationNative<2> for ToyHashPermutation<'_> {

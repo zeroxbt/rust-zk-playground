@@ -1,7 +1,4 @@
-use crate::{
-    sponge::gadget::SpongeGadget,
-    toy_hash::{native::ToyHashPermutation, spec::TOY_HASH_SPEC},
-};
+use crate::{sponge::gadget::SpongeGadget, toy_hash::native::ToyHashPermutation};
 use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 use ark_relations::r1cs::{
@@ -39,12 +36,10 @@ impl ConstraintSynthesizer<Fr> for ToyHashCircuit {
             self.h.ok_or(SynthesisError::AssignmentMissing)?
         };
 
-        let perm = ToyHashPermutation {
-            spec: &TOY_HASH_SPEC,
-        }; // implements PermutationGadget
+        let perm = ToyHashPermutation::default();
         let sponge = SpongeGadget::<_, 2, 1> { perm };
 
-        let out = sponge.hash(&cs, x.as_slice(), None, 1)?;
+        let out = sponge.hash(&cs, x.as_slice(), 1)?;
 
         let h_var = cs.new_input_variable(|| Ok(h))?;
         cs.enforce_constraint(
@@ -59,10 +54,7 @@ impl ConstraintSynthesizer<Fr> for ToyHashCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        sponge::native::SpongeNative,
-        toy_hash::{native::ToyHashPermutation, spec::TOY_HASH_SPEC},
-    };
+    use crate::{sponge::native::SpongeNative, toy_hash::native::ToyHashPermutation};
 
     use super::*;
     use ark_bls12_381::Bls12_381;
@@ -74,11 +66,7 @@ mod tests {
     fn create_circuits() -> (ToyHashCircuit, ToyHashCircuit) {
         let x0 = Fr::from(7u64);
         let x1 = Fr::from(8u64);
-        let sponge = SpongeNative::<_, 2, 1> {
-            perm: ToyHashPermutation {
-                spec: &TOY_HASH_SPEC,
-            },
-        };
+        let sponge: SpongeNative<ToyHashPermutation, 2, 1> = SpongeNative::default();
         let h = sponge.hash(&[x0, x1]);
         let setup_circuit = ToyHashCircuit::new(None, None);
         let prove_circuit = ToyHashCircuit::new(Some(vec![x0, x1]), Some(h));
@@ -124,11 +112,7 @@ mod tests {
     fn toy_hash_wrong_witnesses() {
         let x0 = Fr::from(7u64);
         let x1 = Fr::from(8u64);
-        let sponge = SpongeNative::<_, 2, 1> {
-            perm: ToyHashPermutation {
-                spec: &TOY_HASH_SPEC,
-            },
-        };
+        let sponge: SpongeNative<ToyHashPermutation, 2, 1> = SpongeNative::default();
         let h = sponge.hash(&[x0, x1]);
         let x_wrong = Fr::from(6u64);
 

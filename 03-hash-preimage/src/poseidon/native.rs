@@ -1,9 +1,20 @@
-use crate::{poseidon::spec::PoseidonSpec, sponge::native::PermutationNative};
+use crate::{
+    poseidon::spec::{POSEIDON_SPEC, PoseidonSpec},
+    sponge::native::PermutationNative,
+};
 use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, Field};
 
 pub struct PoseidonPermutation<'a> {
     pub(crate) spec: &'a PoseidonSpec,
+}
+
+impl Default for PoseidonPermutation<'_> {
+    fn default() -> Self {
+        Self {
+            spec: &POSEIDON_SPEC,
+        }
+    }
 }
 
 impl PermutationNative<3> for PoseidonPermutation<'_> {
@@ -95,11 +106,7 @@ mod tests {
     fn hash_is_deterministic() {
         let x0 = Fr::from(1u64);
         let x1 = Fr::from(2u64);
-        let sponge = SpongeNative::<_, 3, 2> {
-            perm: PoseidonPermutation {
-                spec: &POSEIDON_SPEC,
-            },
-        };
+        let sponge: SpongeNative<PoseidonPermutation, 3, 2> = SpongeNative::default();
         let h1 = sponge.hash(&[x0, x1]);
         let h2 = sponge.hash(&[x0, x1]);
         assert_eq!(h1, h2);
@@ -109,11 +116,7 @@ mod tests {
     fn hash_changes_when_input_changes() {
         let x0 = Fr::from(1u64);
         let x1 = Fr::from(2u64);
-        let sponge = SpongeNative::<_, 3, 2> {
-            perm: PoseidonPermutation {
-                spec: &POSEIDON_SPEC,
-            },
-        };
+        let sponge: SpongeNative<PoseidonPermutation, 3, 2> = SpongeNative::default();
         let h1 = sponge.hash(&[x0, x1]);
         let h2 = sponge.hash(&[x0 + Fr::ONE, x1]);
         assert_ne!(h1, h2);
@@ -131,11 +134,7 @@ mod tests {
         sponge.absorb(&x1);
         let expected = sponge.squeeze_field_elements::<Fr>(1)[0];
 
-        let sponge = SpongeNative::<_, 3, 2> {
-            perm: PoseidonPermutation {
-                spec: &POSEIDON_SPEC,
-            },
-        };
+        let sponge: SpongeNative<PoseidonPermutation, 3, 2> = SpongeNative::default();
         assert_eq!(sponge.hash(&[x0, x1]), expected);
     }
 }

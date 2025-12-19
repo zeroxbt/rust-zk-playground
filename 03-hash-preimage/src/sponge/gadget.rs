@@ -14,6 +14,7 @@ where
 {
     pub perm: P,
 }
+
 pub trait PermutationGadget<const T: usize> {
     fn permute_in_place(
         &self,
@@ -27,6 +28,15 @@ where
     P: PermutationGadget<WIDTH>,
 {
     pub fn hash(
+        &self,
+        cs: &ConstraintSystemRef<Fr>,
+        msg: &[Fr],
+        squeeze_lane: usize,
+    ) -> Result<State, SynthesisError> {
+        self.hash_with_dst(cs, msg, None, squeeze_lane)
+    }
+
+    pub fn hash_with_dst(
         &self,
         cs: &ConstraintSystemRef<Fr>,
         msg: &[Fr],
