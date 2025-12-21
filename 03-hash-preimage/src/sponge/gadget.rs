@@ -30,7 +30,7 @@ where
     pub fn hash(
         &self,
         cs: &ConstraintSystemRef<Fr>,
-        msg: &[Fr],
+        msg: &[State],
         squeeze_lane: usize,
     ) -> Result<State, SynthesisError> {
         self.hash_with_dst(cs, msg, None, squeeze_lane)
@@ -39,7 +39,7 @@ where
     pub fn hash_with_dst(
         &self,
         cs: &ConstraintSystemRef<Fr>,
-        msg: &[Fr],
+        msg: &[State],
         dst_capacity: Option<Fr>,
         squeeze_lane: usize,
     ) -> Result<State, SynthesisError> {
@@ -71,14 +71,13 @@ where
 
         // absorb + permute per block
         for chunk in msg.chunks(RATE) {
-            for (lane, val) in chunk.iter().enumerate() {
+            for (lane, x) in chunk.iter().enumerate() {
                 let idx = 1 + lane;
                 let old_var = state[idx].var;
-                state[idx].val += *val;
-                let x_var = cs.new_witness_variable(|| Ok(*val))?;
+                state[idx].val += x.val;
                 state[idx].var = cs.new_witness_variable(|| Ok(state[idx].val))?;
                 cs.enforce_constraint(
-                    LinearCombination::from(old_var) + (Fr::ONE, x_var),
+                    LinearCombination::from(old_var) + (Fr::ONE, x.var),
                     LinearCombination::from(Variable::One),
                     LinearCombination::from(state[idx].var),
                 )?;
