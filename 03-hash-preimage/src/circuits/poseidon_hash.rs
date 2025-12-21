@@ -47,16 +47,15 @@ impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
 
         let mut msg_states = Vec::with_capacity(msg_len);
         for x in msg {
-            let x_var = cs.new_witness_variable(|| Ok(x))?;
-            msg_states.push(State { val: x, var: x_var })
+            msg_states.push(State::witness(&cs, x)?)
         }
         let out = sponge.hash(&cs, &msg_states, /*squeeze_lane=*/ 1)?;
 
-        let h_var = cs.new_input_variable(|| Ok(h))?;
+        let h = State::input(&cs, h)?;
         cs.enforce_constraint(
-            LinearCombination::from(out.var),
+            LinearCombination::from(out.var()),
             LinearCombination::from(Variable::One),
-            LinearCombination::from(h_var),
+            LinearCombination::from(h.var()),
         )?;
 
         Ok(())

@@ -4,8 +4,32 @@ use ark_relations::r1cs::{ConstraintSystemRef, LinearCombination, SynthesisError
 
 #[derive(Clone, Copy, Debug)]
 pub struct State {
-    pub val: Fr,
-    pub var: Variable,
+    val: Fr,
+    var: Variable,
+}
+
+impl State {
+    pub fn witness(cs: &ConstraintSystemRef<Fr>, val: Fr) -> Result<Self, SynthesisError> {
+        Ok(Self {
+            val,
+            var: cs.new_witness_variable(|| Ok(val))?,
+        })
+    }
+
+    pub fn input(cs: &ConstraintSystemRef<Fr>, val: Fr) -> Result<Self, SynthesisError> {
+        Ok(Self {
+            val,
+            var: cs.new_input_variable(|| Ok(val))?,
+        })
+    }
+
+    pub fn val(&self) -> Fr {
+        self.val
+    }
+
+    pub fn var(&self) -> Variable {
+        self.var
+    }
 }
 
 pub struct SpongeGadget<P, const WIDTH: usize, const RATE: usize>
@@ -50,9 +74,9 @@ where
         });
 
         for s in &mut state {
-            s.var = cs.new_witness_variable(|| Ok(Fr::ZERO))?;
+            *s = State::witness(cs, Fr::ZERO)?;
             cs.enforce_constraint(
-                LinearCombination::from(s.var),
+                LinearCombination::from(s.var()),
                 LinearCombination::from(Variable::One),
                 LinearCombination::zero(),
             )?;
@@ -60,10 +84,9 @@ where
 
         // optional DST in capacity lane (lane 0 in your layout)
         if let Some(tag) = dst_capacity {
-            state[0].val = tag;
-            state[0].var = cs.new_witness_variable(|| Ok(tag))?;
+            state[0] = State::witness(cs, tag)?;
             cs.enforce_constraint(
-                LinearCombination::from(state[0].var),
+                LinearCombination::from(state[0].var()),
                 LinearCombination::from(Variable::One),
                 LinearCombination::from((tag, Variable::One)),
             )?;
@@ -73,13 +96,12 @@ where
         for chunk in msg.chunks(RATE) {
             for (lane, x) in chunk.iter().enumerate() {
                 let idx = 1 + lane;
-                let old_var = state[idx].var;
-                state[idx].val += x.val;
-                state[idx].var = cs.new_witness_variable(|| Ok(state[idx].val))?;
+                let old_var = state[idx].var();
+                state[idx] = State::witness(cs, state[idx].val() + x.val())?;
                 cs.enforce_constraint(
-                    LinearCombination::from(old_var) + (Fr::ONE, x.var),
+                    LinearCombination::from(old_var) + (Fr::ONE, x.var()),
                     LinearCombination::from(Variable::One),
-                    LinearCombination::from(state[idx].var),
+                    LinearCombination::from(state[idx].var()),
                 )?;
             }
 

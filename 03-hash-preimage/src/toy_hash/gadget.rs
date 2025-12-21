@@ -29,14 +29,13 @@ fn apply_ark(
     state: &mut [State; 2],
 ) -> Result<(), SynthesisError> {
     for (i, s) in state.iter_mut().enumerate() {
-        let old_s_var = s.var;
+        let old_s_var = s.var();
         let c = rc[i];
-        s.val += c;
-        s.var = cs.new_witness_variable(|| Ok(s.val))?;
+        *s = State::witness(cs, s.val() + c)?;
         cs.enforce_constraint(
             LinearCombination::from(old_s_var) + (c, Variable::One),
             LinearCombination::from(Variable::One),
-            LinearCombination::from(s.var),
+            LinearCombination::from(s.var()),
         )?;
     }
 
@@ -51,29 +50,25 @@ fn apply_s_box_5(
     // TODO: generalize s_box to any alpha
     assert!(spec.alpha == 5, "This gadget only supports alpha=5");
     for s in state {
-        let s0_2 = s.val * s.val;
-        let s0_2_var = cs.new_witness_variable(|| Ok(s0_2))?;
+        let s0_2 = State::witness(cs, s.val() * s.val())?;
         cs.enforce_constraint(
-            LinearCombination::from(s.var),
-            LinearCombination::from(s.var),
-            LinearCombination::from(s0_2_var),
+            LinearCombination::from(s.var()),
+            LinearCombination::from(s.var()),
+            LinearCombination::from(s0_2.var()),
         )?;
-        let s0_4 = s0_2 * s0_2;
-        let s0_4_var = cs.new_witness_variable(|| Ok(s0_4))?;
+        let s0_4 = State::witness(cs, s0_2.val() * s0_2.val())?;
         cs.enforce_constraint(
-            LinearCombination::from(s0_2_var),
-            LinearCombination::from(s0_2_var),
-            LinearCombination::from(s0_4_var),
+            LinearCombination::from(s0_2.var()),
+            LinearCombination::from(s0_2.var()),
+            LinearCombination::from(s0_4.var()),
         )?;
-        let s0_5 = s0_4 * s.val;
-        let s0_5_var = cs.new_witness_variable(|| Ok(s0_5))?;
+        let s0_5 = State::witness(cs, s0_4.val() * s.val())?;
         cs.enforce_constraint(
-            LinearCombination::from(s0_4_var),
-            LinearCombination::from(s.var),
-            LinearCombination::from(s0_5_var),
+            LinearCombination::from(s0_4.var()),
+            LinearCombination::from(s.var()),
+            LinearCombination::from(s0_5.var()),
         )?;
-        s.val = s0_5;
-        s.var = s0_5_var;
+        *s = s0_5;
     }
 
     Ok(())
@@ -90,15 +85,14 @@ fn apply_mds(
         let mut val_acc = Fr::ZERO;
         let mut lc_acc = LinearCombination::zero();
         for (j, state_snapshot_elem) in state_snapshot.iter().enumerate() {
-            val_acc += spec.mds[i][j] * state_snapshot_elem.val;
-            lc_acc += (spec.mds[i][j], state_snapshot_elem.var);
+            val_acc += spec.mds[i][j] * state_snapshot_elem.val();
+            lc_acc += (spec.mds[i][j], state_snapshot_elem.var());
         }
-        s.val = val_acc;
-        s.var = cs.new_witness_variable(|| Ok(val_acc))?;
+        *s = State::witness(cs, val_acc)?;
         cs.enforce_constraint(
             lc_acc,
             LinearCombination::from(Variable::One),
-            LinearCombination::from(s.var),
+            LinearCombination::from(s.var()),
         )?;
     }
 

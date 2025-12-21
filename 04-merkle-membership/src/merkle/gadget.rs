@@ -27,8 +27,8 @@ pub fn compute_root(
 /// Enforce boolean: b * (b - 1) = 0
 pub fn enforce_bit(cs: &ConstraintSystemRef<Fr>, b: State) -> Result<(), SynthesisError> {
     cs.enforce_constraint(
-        LinearCombination::from(b.var),
-        LinearCombination::from(b.var) - (Fr::ONE, Variable::One),
+        LinearCombination::from(b.var()),
+        LinearCombination::from(b.var()) - (Fr::ONE, Variable::One),
         LinearCombination::<Fr>::zero(),
     )?;
     Ok(())
@@ -45,43 +45,31 @@ pub fn conditional_swap(
     b: State,
 ) -> Result<(State, State), SynthesisError> {
     // Enforce: b * (sib - cur) = m
-    let t_lc = LinearCombination::from(sib.var) + (Fr::from(-1i64), cur.var);
-    let m_val = b.val * (sib.val - cur.val);
-    let m_var = cs.new_witness_variable(|| Ok(m_val))?;
+    let t_lc = LinearCombination::from(sib.var()) + (Fr::from(-1i64), cur.var());
+    let m = State::witness(cs, b.val() * (sib.val() - cur.val()))?;
     cs.enforce_constraint(
-        LinearCombination::from(b.var),
+        LinearCombination::from(b.var()),
         t_lc,
-        LinearCombination::from(m_var),
+        LinearCombination::from(m.var()),
     )?;
 
     // Enforce: left = cur + m
-    let left_val = cur.val + m_val;
-    let left_var = cs.new_witness_variable(|| Ok(left_val))?;
+    let left = State::witness(cs, cur.val() + m.val())?;
     cs.enforce_constraint(
-        LinearCombination::from(cur.var) + (Fr::ONE, m_var),
+        LinearCombination::from(cur.var()) + (Fr::ONE, m.var()),
         LinearCombination::from(Variable::One),
-        LinearCombination::from(left_var),
+        LinearCombination::from(left.var()),
     )?;
 
     // Enforce: right = sib - m
-    let right_val = sib.val - m_val;
-    let right_var = cs.new_witness_variable(|| Ok(right_val))?;
+    let right = State::witness(cs, sib.val() - m.val())?;
     cs.enforce_constraint(
-        LinearCombination::from(sib.var) + (Fr::from(-1i64), m_var),
+        LinearCombination::from(sib.var()) + (Fr::from(-1i64), m.var()),
         LinearCombination::from(Variable::One),
-        LinearCombination::from(right_var),
+        LinearCombination::from(right.var()),
     )?;
 
-    Ok((
-        State {
-            val: left_val,
-            var: left_var,
-        },
-        State {
-            val: right_val,
-            var: right_var,
-        },
-    ))
+    Ok((left, right))
 }
 
 #[cfg(test)]
@@ -92,11 +80,6 @@ mod tests {
     use ark_relations::r1cs::ConstraintSystem;
     use ark_std::test_rng;
 
-    fn alloc_state(cs: &ark_relations::r1cs::ConstraintSystemRef<Fr>, v: Fr) -> State {
-        let var = cs.new_witness_variable(|| Ok(v)).unwrap();
-        State { val: v, var }
-    }
-
     #[test]
     fn conditional_swap_b0_yields_left_cur_right_sib() {
         let cs = ConstraintSystem::<Fr>::new_ref();
@@ -106,16 +89,16 @@ mod tests {
         let sib_v = Fr::rand(&mut rng);
         let b_v = Fr::ZERO;
 
-        let cur = alloc_state(&cs, cur_v);
-        let sib = alloc_state(&cs, sib_v);
-        let b = alloc_state(&cs, b_v);
+        let cur = State::witness(&cs, cur_v).unwrap();
+        let sib = State::witness(&cs, sib_v).unwrap();
+        let b = State::witness(&cs, b_v).unwrap();
 
         enforce_bit(&cs, b).unwrap();
         let (left, right) = conditional_swap(&cs, cur, sib, b).unwrap();
 
         assert!(cs.is_satisfied().unwrap());
-        assert_eq!(left.val, cur_v);
-        assert_eq!(right.val, sib_v);
+        assert_eq!(left.val(), cur_v);
+        assert_eq!(right.val(), sib_v);
     }
 
     #[test]
@@ -127,22 +110,22 @@ mod tests {
         let sib_v = Fr::rand(&mut rng);
         let b_v = Fr::ONE;
 
-        let cur = alloc_state(&cs, cur_v);
-        let sib = alloc_state(&cs, sib_v);
-        let b = alloc_state(&cs, b_v);
+        let cur = State::witness(&cs, cur_v).unwrap();
+        let sib = State::witness(&cs, sib_v).unwrap();
+        let b = State::witness(&cs, b_v).unwrap();
 
         enforce_bit(&cs, b).unwrap();
         let (left, right) = conditional_swap(&cs, cur, sib, b).unwrap();
 
         assert!(cs.is_satisfied().unwrap());
-        assert_eq!(left.val, sib_v);
-        assert_eq!(right.val, cur_v);
+        assert_eq!(left.val(), sib_v);
+        assert_eq!(right.val(), cur_v);
     }
 
     #[test]
     fn enforce_bit_rejects_non_boolean() {
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let b = alloc_state(&cs, Fr::from(2u64));
+        let b = State::witness(&cs, Fr::from(2u64)).unwrap();
 
         enforce_bit(&cs, b).unwrap();
 
@@ -158,9 +141,9 @@ mod tests {
         let sib_v = Fr::rand(&mut rng);
         let b_v = Fr::from(2u64);
 
-        let cur = alloc_state(&cs, cur_v);
-        let sib = alloc_state(&cs, sib_v);
-        let b = alloc_state(&cs, b_v);
+        let cur = State::witness(&cs, cur_v).unwrap();
+        let sib = State::witness(&cs, sib_v).unwrap();
+        let b = State::witness(&cs, b_v).unwrap();
 
         enforce_bit(&cs, b).unwrap();
         let _ = conditional_swap(&cs, cur, sib, b).unwrap();
@@ -177,40 +160,35 @@ mod tests {
         let sib_v = Fr::rand(&mut rng);
         let b_v = Fr::ONE;
 
-        let cur = alloc_state(&cs, cur_v);
-        let sib = alloc_state(&cs, sib_v);
-        let b = alloc_state(&cs, b_v);
+        let cur = State::witness(&cs, cur_v).unwrap();
+        let sib = State::witness(&cs, sib_v).unwrap();
+        let b = State::witness(&cs, b_v).unwrap();
 
         enforce_bit(&cs, b).unwrap();
 
         // Build constraints similarly to conditional_swap but sabotage left witness.
-        let t_lc = LinearCombination::from(sib.var) + (Fr::from(-1i64), cur.var);
-
-        let m_val = b_v * (sib_v - cur_v);
-        let m_var = cs.new_witness_variable(|| Ok(m_val)).unwrap();
-
+        let t_lc = LinearCombination::from(sib.var()) + (Fr::from(-1i64), cur.var());
+        let m = State::witness(&cs, b_v * (sib_v - cur_v)).unwrap();
         cs.enforce_constraint(
-            LinearCombination::from(b.var),
+            LinearCombination::from(b.var()),
             t_lc,
-            LinearCombination::from(m_var),
+            LinearCombination::from(m.var()),
         )
         .unwrap();
 
-        let wrong_left = Fr::rand(&mut rng);
-        let left_var = cs.new_witness_variable(|| Ok(wrong_left)).unwrap();
+        let wrong_left = State::witness(&cs, Fr::rand(&mut rng)).unwrap();
         cs.enforce_constraint(
-            LinearCombination::from(cur.var) + (Fr::ONE, m_var),
+            LinearCombination::from(cur.var()) + (Fr::ONE, m.var()),
             LinearCombination::from(Variable::One),
-            LinearCombination::from(left_var),
+            LinearCombination::from(wrong_left.var()),
         )
         .unwrap();
 
-        let right_val = sib_v - m_val;
-        let right_var = cs.new_witness_variable(|| Ok(right_val)).unwrap();
+        let right = State::witness(&cs, sib_v - m.val()).unwrap();
         cs.enforce_constraint(
-            LinearCombination::from(sib.var) + (Fr::from(-1i64), m_var),
+            LinearCombination::from(sib.var()) + (Fr::from(-1i64), m.var()),
             LinearCombination::from(Variable::One),
-            LinearCombination::from(right_var),
+            LinearCombination::from(right.var()),
         )
         .unwrap();
 
