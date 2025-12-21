@@ -6,7 +6,13 @@ use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, Field};
 
 pub struct PoseidonPermutation<'a> {
-    pub(crate) spec: &'a PoseidonSpec,
+    spec: &'a PoseidonSpec,
+}
+
+impl PoseidonPermutation<'_> {
+    pub fn spec(&self) -> &PoseidonSpec {
+        self.spec
+    }
 }
 
 impl Default for PoseidonPermutation<'_> {

@@ -6,7 +6,13 @@ use ark_bls12_381::Fr;
 use ark_ff::Field;
 
 pub struct ToyHashPermutation<'a> {
-    pub(crate) spec: &'a ToyHashSpec,
+    spec: &'a ToyHashSpec,
+}
+
+impl ToyHashPermutation<'_> {
+    pub fn spec(&self) -> &ToyHashSpec {
+        self.spec
+    }
 }
 
 impl Default for ToyHashPermutation<'_> {

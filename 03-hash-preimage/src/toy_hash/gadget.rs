@@ -13,10 +13,10 @@ impl PermutationGadget<2> for ToyHashPermutation<'_> {
         cs: &ConstraintSystemRef<Fr>,
         state: &mut [State; 2],
     ) -> Result<(), SynthesisError> {
-        for rc in &self.spec.ark {
+        for rc in &self.spec().ark {
             apply_ark(cs, rc, state)?;
-            apply_s_box_5(self.spec, cs, state)?;
-            apply_mds(self.spec, cs, state)?;
+            apply_s_box_5(self.spec(), cs, state)?;
+            apply_mds(self.spec(), cs, state)?;
         }
 
         Ok(())

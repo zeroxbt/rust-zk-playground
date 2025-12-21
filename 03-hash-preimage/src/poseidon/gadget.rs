@@ -16,29 +16,29 @@ impl PermutationGadget<3> for PoseidonPermutation<'_> {
         cs: &ConstraintSystemRef<Fr>,
         state: &mut [State; 3],
     ) -> Result<(), SynthesisError> {
-        assert!(self.spec.full_rounds.is_multiple_of(2));
+        assert!(self.spec().full_rounds.is_multiple_of(2));
         assert_eq!(
-            self.spec.ark.len(),
-            self.spec.full_rounds + self.spec.partial_rounds
+            self.spec().ark.len(),
+            self.spec().full_rounds + self.spec().partial_rounds
         );
 
-        let (first_full, rest) = self.spec.ark.split_at(self.spec.full_rounds / 2);
-        let (partial, last_full) = rest.split_at(self.spec.partial_rounds);
+        let (first_full, rest) = self.spec().ark.split_at(self.spec().full_rounds / 2);
+        let (partial, last_full) = rest.split_at(self.spec().partial_rounds);
 
         for rc in first_full {
             apply_ark(cs, rc, state)?;
-            apply_s_box_17(self.spec, cs, state, true)?;
-            apply_mds(self.spec, cs, state)?;
+            apply_s_box_17(self.spec(), cs, state, true)?;
+            apply_mds(self.spec(), cs, state)?;
         }
         for rc in partial {
             apply_ark(cs, rc, state)?;
-            apply_s_box_17(self.spec, cs, state, false)?;
-            apply_mds(self.spec, cs, state)?;
+            apply_s_box_17(self.spec(), cs, state, false)?;
+            apply_mds(self.spec(), cs, state)?;
         }
         for rc in last_full {
             apply_ark(cs, rc, state)?;
-            apply_s_box_17(self.spec, cs, state, true)?;
-            apply_mds(self.spec, cs, state)?;
+            apply_s_box_17(self.spec(), cs, state, true)?;
+            apply_mds(self.spec(), cs, state)?;
         }
 
         Ok(())
