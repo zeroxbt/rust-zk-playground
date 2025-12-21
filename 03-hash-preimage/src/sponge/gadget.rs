@@ -23,6 +23,13 @@ impl State {
         })
     }
 
+    pub fn zero() -> Self {
+        Self {
+            val: Fr::ZERO,
+            var: Variable::Zero,
+        }
+    }
+
     pub fn val(&self) -> Fr {
         self.val
     }
@@ -36,7 +43,16 @@ pub struct SpongeGadget<P, const WIDTH: usize, const RATE: usize>
 where
     P: PermutationGadget<WIDTH>,
 {
-    pub perm: P,
+    perm: P,
+}
+
+impl<P, const WIDTH: usize, const RATE: usize> Default for SpongeGadget<P, WIDTH, RATE>
+where
+    P: PermutationGadget<WIDTH> + Default,
+{
+    fn default() -> Self {
+        Self { perm: P::default() }
+    }
 }
 
 pub trait PermutationGadget<const T: usize> {

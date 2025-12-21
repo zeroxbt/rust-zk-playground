@@ -42,8 +42,7 @@ impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
             self.h.ok_or(SynthesisError::AssignmentMissing)?
         };
 
-        let perm = PoseidonPermutation::default();
-        let sponge = SpongeGadget::<_, WIDTH, RATE> { perm };
+        let sponge: SpongeGadget<PoseidonPermutation, WIDTH, RATE> = SpongeGadget::default();
 
         let mut msg_states = Vec::with_capacity(msg_len);
         for x in msg {

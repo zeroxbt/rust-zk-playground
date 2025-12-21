@@ -39,8 +39,7 @@ impl ConstraintSynthesizer<Fr> for ToyHashCircuit {
             self.h.ok_or(SynthesisError::AssignmentMissing)?
         };
 
-        let perm = ToyHashPermutation::default();
-        let sponge = SpongeGadget::<_, 2, 1> { perm };
+        let sponge: SpongeGadget<ToyHashPermutation, 2, 1> = SpongeGadget::default();
 
         let mut msg_states = Vec::with_capacity(msg_len);
         for x in msg {
