@@ -28,33 +28,19 @@ impl ConstraintSynthesizer<Fr> for MerkleMembershipCircuit {
             }
         })?;
 
-        let mut path = [State::zero(); DEPTH];
-        if !is_setup {
-            for (p, pv) in path
-                .iter_mut()
-                .zip(self.path.ok_or(SynthesisError::AssignmentMissing)?)
-            {
-                *p = State::witness(&cs, pv)?;
-            }
+        let path_vals = if is_setup {
+            [Fr::ZERO; DEPTH]
         } else {
-            for p in path.iter_mut() {
-                *p = State::witness(&cs, Fr::ZERO)?;
-            }
+            self.path.ok_or(SynthesisError::AssignmentMissing)?
         };
+        let path = State::witness_array(&cs, &path_vals)?;
 
-        let mut index_bits = [State::zero(); DEPTH];
-        if !is_setup {
-            for (ib, ibv) in index_bits
-                .iter_mut()
-                .zip(self.index_bits.ok_or(SynthesisError::AssignmentMissing)?)
-            {
-                *ib = State::witness(&cs, ibv)?;
-            }
+        let index_bits_vals = if is_setup {
+            [Fr::ZERO; DEPTH]
         } else {
-            for ib in index_bits.iter_mut() {
-                *ib = State::witness(&cs, Fr::ZERO)?;
-            }
+            self.index_bits.ok_or(SynthesisError::AssignmentMissing)?
         };
+        let index_bits = State::witness_array(&cs, &index_bits_vals)?;
 
         let sponge: SpongeGadget<PoseidonPermutation, 3, 2> = SpongeGadget::default();
         let root = compute_root(&cs, &sponge, leaf, &path, &index_bits)?;

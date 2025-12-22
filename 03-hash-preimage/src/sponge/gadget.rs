@@ -16,6 +16,18 @@ impl State {
         })
     }
 
+    pub fn witness_array<'a, const T: usize>(
+        cs: &'a ConstraintSystemRef<Fr>,
+        vals: &'a [Fr],
+    ) -> Result<[State; T], SynthesisError> {
+        let mut states = [State::zero(); T];
+        for (state, &val) in states.iter_mut().zip(vals) {
+            *state = Self::witness(cs, val)?;
+        }
+
+        Ok(states)
+    }
+
     pub fn input(cs: &ConstraintSystemRef<Fr>, val: Fr) -> Result<Self, SynthesisError> {
         Ok(Self {
             val,

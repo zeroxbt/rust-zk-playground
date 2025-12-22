@@ -45,7 +45,7 @@ pub fn conditional_swap(
     b: State,
 ) -> Result<(State, State), SynthesisError> {
     // Enforce: b * (sib - cur) = m
-    let t_lc = LinearCombination::from(sib.var()) + (Fr::from(-1i64), cur.var());
+    let t_lc = LinearCombination::from(sib.var()) + (-Fr::ONE, cur.var());
     let m = State::witness(cs, b.val() * (sib.val() - cur.val()))?;
     cs.enforce_constraint(
         LinearCombination::from(b.var()),
@@ -64,7 +64,7 @@ pub fn conditional_swap(
     // Enforce: right = sib - m
     let right = State::witness(cs, sib.val() - m.val())?;
     cs.enforce_constraint(
-        LinearCombination::from(sib.var()) + (Fr::from(-1i64), m.var()),
+        LinearCombination::from(sib.var()) + (-Fr::ONE, m.var()),
         LinearCombination::from(Variable::One),
         LinearCombination::from(right.var()),
     )?;
@@ -167,7 +167,7 @@ mod tests {
         enforce_bit(&cs, b).unwrap();
 
         // Build constraints similarly to conditional_swap but sabotage left witness.
-        let t_lc = LinearCombination::from(sib.var()) + (Fr::from(-1i64), cur.var());
+        let t_lc = LinearCombination::from(sib.var()) + (-Fr::ONE, cur.var());
         let m = State::witness(&cs, b_v * (sib_v - cur_v)).unwrap();
         cs.enforce_constraint(
             LinearCombination::from(b.var()),
@@ -186,7 +186,7 @@ mod tests {
 
         let right = State::witness(&cs, sib_v - m.val()).unwrap();
         cs.enforce_constraint(
-            LinearCombination::from(sib.var()) + (Fr::from(-1i64), m.var()),
+            LinearCombination::from(sib.var()) + (-Fr::ONE, m.var()),
             LinearCombination::from(Variable::One),
             LinearCombination::from(right.var()),
         )
