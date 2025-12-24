@@ -21,6 +21,7 @@ pub fn select(
 
     Ok(z)
 }
+
 #[cfg(test)]
 mod select_tests {
     use super::*;
