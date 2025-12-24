@@ -6,41 +6,45 @@ use ark_relations::{
 };
 use hash_preimage::sponge::gadget::State;
 
-use crate::gadgets::mux::select;
-
 /// Select exactly one value from an array using one-hot selectors.
 pub fn select_from_array<const T: usize>(
     cs: &ConstraintSystemRef<Fr>,
     selectors: &[State; T],
     values: &[State; T],
 ) -> Result<State, SynthesisError> {
-    let mut lc_acc = lc!();
-    let mut val_acc = Fr::ZERO;
-    let zero = State::witness(cs, Fr::ZERO)?;
+    let mut acc_lc = lc!();
+    let mut acc_val = Fr::ZERO;
 
     for (&a, &s) in values.iter().zip(selectors) {
-        lc_acc += (Fr::ONE, select(cs, s, a, zero)?.var());
-        val_acc += a.val() * s.val();
+        let p_val = s.val() * a.val();
+        let p = State::witness(cs, p_val)?;
+        cs.enforce_constraint(
+            LinearCombination::from(s.var()),
+            LinearCombination::from(a.var()),
+            LinearCombination::from(p.var()),
+        )?;
+        acc_lc += (Fr::ONE, p.var());
+        acc_val += p_val;
     }
 
-    let out = State::witness(cs, val_acc)?;
-
+    let acc = State::witness(cs, acc_val)?;
     cs.enforce_constraint(
-        lc_acc,
+        acc_lc,
         LinearCombination::from(Variable::One),
-        LinearCombination::from(out.var()),
+        LinearCombination::from(acc.var()),
     )?;
 
-    Ok(out)
+    Ok(acc)
 }
 
 #[cfg(test)]
 mod select_from_array_tests {
     use super::*;
-    use crate::gadgets::array_select::select_from_array;
-    use crate::gadgets::one_hot::enforce_one_hot;
     use ark_bls12_381::Fr;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef, LinearCombination, Variable};
+
+    use crate::gadgets::array_select::select_from_array;
+    use crate::gadgets::one_hot::enforce_one_hot;
 
     fn witness_vals<const T: usize>(cs: &ConstraintSystemRef<Fr>, vals: [u64; T]) -> [State; T] {
         let frs: Vec<Fr> = vals.into_iter().map(Fr::from).collect();
@@ -53,7 +57,6 @@ mod select_from_array_tests {
         arr[idx] = Fr::ONE;
         State::witness_array::<T>(cs, &arr).unwrap()
     }
-
     fn bind_public_equal(cs: &ConstraintSystemRef<Fr>, z: State, out: State) {
         cs.enforce_constraint(
             LinearCombination::from(z.var()),
@@ -76,7 +79,6 @@ mod select_from_array_tests {
             enforce_one_hot(&cs, &selectors).unwrap();
             let out = select_from_array::<T>(&cs, &selectors, &values).unwrap();
 
-            // out must match the selected value
             assert!(cs.is_satisfied().unwrap());
             assert_eq!(out.val(), values[idx].val());
         }
@@ -95,7 +97,6 @@ mod select_from_array_tests {
         enforce_one_hot(&cs, &selectors).unwrap();
         let out = select_from_array::<T>(&cs, &selectors, &values).unwrap();
 
-        // Correct selected value is 13; make public z wrong on purpose.
         let z_wrong = State::input(&cs, Fr::from(999u64)).unwrap();
         bind_public_equal(&cs, z_wrong, out);
 
@@ -181,7 +182,6 @@ mod select_from_array_tests {
         enforce_one_hot(&cs, &selectors).unwrap();
         let out = select_from_array::<T>(&cs, &selectors, &values).unwrap();
 
-        // Bind to a public input to prevent "free" output
         let z = State::input(&cs, values[4].val()).unwrap();
         bind_public_equal(&cs, z, out);
 
