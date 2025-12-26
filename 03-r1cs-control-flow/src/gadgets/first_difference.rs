@@ -14,57 +14,56 @@ pub fn first_difference_selectors<const T: usize>(
         let diff_val = a.val() - b.val();
         let inv_val = diff_val.inverse().unwrap_or(Fr::ZERO);
 
-        // neq = 1 if diff ≠ 0, else 0
-        let neq_val = if diff_val == Fr::ZERO {
-            Fr::ZERO
-        } else {
+        let z_val = if diff_val == Fr::ZERO {
             Fr::ONE
+        } else {
+            Fr::ZERO
         };
 
         let inv = State::witness(cs, inv_val)?;
-        let neq = State::witness(cs, neq_val)?;
+        let z = State::witness(cs, z_val)?;
 
         let diff_lc = LinearCombination::from(a.var()) + (-Fr::ONE, b.var());
 
-        // neq = if a != b { 1 } else { 0 }
+        // (a - b) * inv = 1 - z
         cs.enforce_constraint(
-            LinearCombination::from(a.var()) + (-Fr::ONE, b.var()),
+            diff_lc.clone(),
             LinearCombination::from(inv.var()),
-            LinearCombination::from(neq.var()),
+            LinearCombination::from(Variable::One) + (-Fr::ONE, z.var()),
         )?;
 
-        // neq × (a - b) = 0
+        // z * (a - b) = 0
         cs.enforce_constraint(
-            LinearCombination::from(neq.var()),
+            LinearCombination::from(z.var()),
             diff_lc,
             LinearCombination::zero(),
         )?;
 
-        // Enforce neq ∈ {0,1}: neq * (neq - 1) = 0
+        // z ∈ {0,1}
         cs.enforce_constraint(
-            LinearCombination::from(neq.var()),
-            LinearCombination::from(neq.var()) + (-Fr::ONE, Variable::One),
+            LinearCombination::from(z.var()),
+            LinearCombination::from(Variable::One) + (-Fr::ONE, z.var()),
             LinearCombination::zero(),
         )?;
 
-        let s = State::witness(cs, (Fr::ONE - found.val()) * neq.val())?;
-        // s = if found != b { 0 } else { neq }
+        let s = State::witness(cs, (Fr::ONE - found.val()) * (Fr::ONE - z.val()))?;
+        // (1 - found) × (1 - z) = s
         cs.enforce_constraint(
-            LinearCombination::from(found.var()),
-            LinearCombination::from(neq.var()),
-            LinearCombination::from(neq.var()) + (-Fr::ONE, s.var()),
+            LinearCombination::from(Variable::One) + (-Fr::ONE, found.var()),
+            LinearCombination::from(Variable::One) + (-Fr::ONE, z.var()),
+            LinearCombination::from(s.var()),
         )?;
         selectors[i] = s;
 
         let old_found = found;
         found = State::witness(
             cs,
-            neq.val() * (Fr::ONE - old_found.val()) + old_found.val(),
+            (Fr::ONE - z.val()) * (Fr::ONE - old_found.val()) + old_found.val(),
         )?;
-        // found = if found { 1 } else { neq }
+        // (1 - old_found) × (1 - z) = found - old_found
         cs.enforce_constraint(
             LinearCombination::from(Variable::One) + (-Fr::ONE, old_found.var()),
-            LinearCombination::from(neq.var()),
+            LinearCombination::from(Variable::One) + (-Fr::ONE, z.var()),
             LinearCombination::from(found.var()) + (-Fr::ONE, old_found.var()),
         )?;
     }
