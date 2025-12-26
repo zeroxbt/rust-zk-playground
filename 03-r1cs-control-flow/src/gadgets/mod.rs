@@ -1,6 +1,7 @@
 pub mod array_select;
 pub mod array_update;
 pub mod bool;
+pub mod cond;
 pub mod first_difference;
 pub mod mux;
 pub mod neq;
