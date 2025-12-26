@@ -232,11 +232,7 @@ mod tests {
     /// IMPORTANT: The circuit internally updates path_r during execution,
     /// so we return the ORIGINAL path_r_initial, not the updated one.
     /// The circuit will compute the update itself.
-    fn create_transfer_scenario(
-        sender_balance: u64,
-        receiver_balance: u64,
-        amount: u64,
-    ) -> (
+    type TransferScenario = (
         Fr,
         Fr, // leaf_s, leaf_r
         [Fr; DEPTH],
@@ -246,7 +242,13 @@ mod tests {
         Fr,          // amount
         Fr,
         Fr, // old_root, new_root
-    ) {
+    );
+
+    fn create_transfer_scenario(
+        sender_balance: u64,
+        receiver_balance: u64,
+        amount: u64,
+    ) -> TransferScenario {
         // Initial tree with sender at index 0, receiver at index 1
         let (leaf_s, leaf_r, path_s_initial, path_r_initial, old_root) =
             create_two_leaf_tree(sender_balance, receiver_balance);
@@ -912,22 +914,24 @@ mod tests {
     /// - Receiver index bits: all zeros up to D, then 1 at D
     ///
     /// This means they share a common path for levels 0..D, then diverge.
+    struct DivergenceScenario {
+        leaf_s: Fr,
+        leaf_r: Fr,
+        path_s: [Fr; DEPTH],
+        path_r: [Fr; DEPTH],
+        index_bits_s: [Fr; DEPTH],
+        index_bits_r: [Fr; DEPTH],
+        amount: Fr,
+        old_root: Fr,
+        new_root: Fr,
+    }
+
     fn create_divergence_at_depth(
         sender_balance: u64,
         receiver_balance: u64,
         amount: u64,
         divergence_depth: usize,
-    ) -> (
-        Fr,
-        Fr,
-        [Fr; DEPTH],
-        [Fr; DEPTH],
-        [Fr; DEPTH],
-        [Fr; DEPTH],
-        Fr,
-        Fr,
-        Fr,
-    ) {
+    ) -> DivergenceScenario {
         assert!(divergence_depth < DEPTH, "divergence_depth must be < DEPTH");
 
         let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
@@ -1023,23 +1027,23 @@ mod tests {
         let mid_root_r = compute_native_root(leaf_r, &path_r_updated, &index_bits_r);
         assert_eq!(mid_root_s, mid_root_r, "mid roots should match");
 
-        (
+        DivergenceScenario {
             leaf_s,
             leaf_r,
             path_s,
             path_r, // Original path, circuit updates it
             index_bits_s,
             index_bits_r,
-            amount_fr,
+            amount: amount_fr,
             old_root,
             new_root,
-        )
+        }
     }
 
     #[test]
     fn test_divergence_at_depth_0() {
         // First difference at the very first level (immediate divergence)
-        let (
+        let DivergenceScenario {
             leaf_s,
             leaf_r,
             path_s,
@@ -1049,7 +1053,7 @@ mod tests {
             amount,
             old_root,
             new_root,
-        ) = create_divergence_at_depth(100, 50, 30, 0);
+        } = create_divergence_at_depth(100, 50, 30, 0);
 
         // Verify divergence is at expected depth
         let first_diff = (0..DEPTH)
@@ -1086,7 +1090,7 @@ mod tests {
         let divergence_depth = 3;
         assert!(divergence_depth < DEPTH, "Test requires DEPTH > 3");
 
-        let (
+        let DivergenceScenario {
             leaf_s,
             leaf_r,
             path_s,
@@ -1096,7 +1100,7 @@ mod tests {
             amount,
             old_root,
             new_root,
-        ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+        } = create_divergence_at_depth(100, 50, 30, divergence_depth);
 
         // Verify divergence is at expected depth
         let first_diff = (0..DEPTH)
@@ -1135,7 +1139,7 @@ mod tests {
         // First difference near the top of tree (DEPTH - 2)
         let divergence_depth = DEPTH - 2;
 
-        let (
+        let DivergenceScenario {
             leaf_s,
             leaf_r,
             path_s,
@@ -1145,7 +1149,7 @@ mod tests {
             amount,
             old_root,
             new_root,
-        ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+        } = create_divergence_at_depth(100, 50, 30, divergence_depth);
 
         // Verify divergence is at expected depth
         let first_diff = (0..DEPTH)
@@ -1188,7 +1192,7 @@ mod tests {
         // This is the latest possible divergence - paths share almost everything
         let divergence_depth = DEPTH - 1;
 
-        let (
+        let DivergenceScenario {
             leaf_s,
             leaf_r,
             path_s,
@@ -1198,7 +1202,7 @@ mod tests {
             amount,
             old_root,
             new_root,
-        ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+        } = create_divergence_at_depth(100, 50, 30, divergence_depth);
 
         // Verify divergence is at expected depth
         let first_diff = (0..DEPTH)
@@ -1632,7 +1636,7 @@ mod tests {
         // This provides complete coverage of the spine/patching logic
 
         for divergence_depth in 0..DEPTH {
-            let (
+            let DivergenceScenario {
                 leaf_s,
                 leaf_r,
                 path_s,
@@ -1642,7 +1646,7 @@ mod tests {
                 amount,
                 old_root,
                 new_root,
-            ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+            } = create_divergence_at_depth(100, 50, 30, divergence_depth);
 
             let circuit = MerkleTransferKernelCircuit {
                 leaf_s: Some(leaf_s),
@@ -1676,7 +1680,7 @@ mod tests {
 
         for divergence_depth in 1..DEPTH {
             // Create valid scenario
-            let (
+            let DivergenceScenario {
                 leaf_s,
                 leaf_r,
                 path_s,
@@ -1685,8 +1689,8 @@ mod tests {
                 index_bits_r,
                 amount,
                 old_root,
-                _new_root,
-            ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+                new_root: _new_root,
+            } = create_divergence_at_depth(100, 50, 30, divergence_depth);
 
             // Compute what the circuit would compute
             let leaf_s_updated = leaf_s - amount;
