@@ -894,4 +894,835 @@ mod tests {
             num_constraints
         );
     }
+    // ========================================================================
+    // ADDITIONAL SOUNDNESS TESTS
+    // Add these tests to the existing test module in the circuit file
+    // ========================================================================
+
+    // ========================================================================
+    // A. NONTRIVIAL DIVERGENCE DEPTH TESTS
+    // These test first_difference_selectors, spine indexing, and patching
+    // at various tree depths where sender/receiver paths diverge.
+    // ========================================================================
+
+    /// Create a tree where sender and receiver diverge at a specific depth.
+    ///
+    /// For divergence at depth D:
+    /// - Sender index bits: all zeros up to D, then 0 at D
+    /// - Receiver index bits: all zeros up to D, then 1 at D
+    ///
+    /// This means they share a common path for levels 0..D, then diverge.
+    fn create_divergence_at_depth(
+        sender_balance: u64,
+        receiver_balance: u64,
+        amount: u64,
+        divergence_depth: usize,
+    ) -> (
+        Fr,
+        Fr,
+        [Fr; DEPTH],
+        [Fr; DEPTH],
+        [Fr; DEPTH],
+        [Fr; DEPTH],
+        Fr,
+        Fr,
+        Fr,
+    ) {
+        assert!(divergence_depth < DEPTH, "divergence_depth must be < DEPTH");
+
+        let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
+
+        let leaf_s = Fr::from(sender_balance);
+        let leaf_r = Fr::from(receiver_balance);
+
+        // Build index bits: identical up to divergence_depth, then differ
+        let index_bits_s = [Fr::ZERO; DEPTH];
+        let mut index_bits_r = [Fr::ZERO; DEPTH];
+
+        // At divergence_depth: sender goes left (0), receiver goes right (1)
+        index_bits_r[divergence_depth] = Fr::ONE;
+
+        // Build the tree bottom-up to compute paths
+        // We need to construct valid Merkle paths for both leaves
+
+        // Start by computing what the tree looks like
+        // At level divergence_depth, we have two subtrees that merge
+
+        // Compute the hash of leaf_s going up to divergence_depth
+        let mut current_s = leaf_s;
+        let mut path_s = [Fr::ZERO; DEPTH];
+
+        // Compute the hash of leaf_r going up to divergence_depth
+        let mut current_r = leaf_r;
+        let mut path_r = [Fr::ZERO; DEPTH];
+
+        // For levels below divergence, both paths are independent
+        // We'll use dummy siblings (zeros)
+        for i in 0..divergence_depth {
+            path_s[i] = Fr::ZERO; // dummy sibling
+            path_r[i] = Fr::ZERO; // dummy sibling
+
+            // Hash with dummy (on the right for sender, on the right for receiver)
+            // Sender: index bit is 0, so sender is on left
+            current_s = sponge.hash_with_dst(&[current_s, Fr::ZERO], Some(MERKLE_NODE_DST));
+            // Receiver: index bit is 0, so receiver is on left
+            current_r = sponge.hash_with_dst(&[current_r, Fr::ZERO], Some(MERKLE_NODE_DST));
+        }
+
+        // At divergence_depth, the two subtrees merge:
+        // sender's subtree hash is current_s (goes left, index bit 0)
+        // receiver's subtree hash is current_r (goes right, index bit 1)
+        path_s[divergence_depth] = current_r; // sender's sibling is receiver's subtree
+        path_r[divergence_depth] = current_s; // receiver's sibling is sender's subtree
+
+        // Merge them
+        let merged = sponge.hash_with_dst(&[current_s, current_r], Some(MERKLE_NODE_DST));
+        let mut current = merged;
+
+        // Continue up the tree with dummy siblings
+        for i in (divergence_depth + 1)..DEPTH {
+            path_s[i] = Fr::ZERO;
+            path_r[i] = Fr::ZERO;
+            current = sponge.hash_with_dst(&[current, Fr::ZERO], Some(MERKLE_NODE_DST));
+        }
+
+        let old_root = current;
+
+        // Verify paths are correct
+        let computed_root_s = compute_native_root(leaf_s, &path_s, &index_bits_s);
+        let computed_root_r = compute_native_root(leaf_r, &path_r, &index_bits_r);
+        assert_eq!(computed_root_s, old_root, "sender path verification failed");
+        assert_eq!(
+            computed_root_r, old_root,
+            "receiver path verification failed"
+        );
+
+        // Now compute the transfer
+        let amount_fr = Fr::from(amount);
+        let leaf_s_updated = Fr::from(sender_balance - amount);
+        let leaf_r_updated = Fr::from(receiver_balance + amount);
+
+        // Compute spine for updated sender
+        let spine = compute_spine(leaf_s_updated, &path_s, &index_bits_s);
+
+        // Find first difference (should be at divergence_depth)
+        let first_diff = (0..DEPTH)
+            .find(|&i| index_bits_s[i] != index_bits_r[i])
+            .unwrap();
+        assert_eq!(first_diff, divergence_depth, "divergence point mismatch");
+
+        // Update receiver's path at divergence point
+        let mut path_r_updated = path_r;
+        path_r_updated[divergence_depth] = spine[divergence_depth];
+
+        // Compute new root
+        let new_root = compute_native_root(leaf_r_updated, &path_r_updated, &index_bits_r);
+
+        // Verify mid roots match
+        let mid_root_s = compute_native_root(leaf_s_updated, &path_s, &index_bits_s);
+        let mid_root_r = compute_native_root(leaf_r, &path_r_updated, &index_bits_r);
+        assert_eq!(mid_root_s, mid_root_r, "mid roots should match");
+
+        (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r, // Original path, circuit updates it
+            index_bits_s,
+            index_bits_r,
+            amount_fr,
+            old_root,
+            new_root,
+        )
+    }
+
+    #[test]
+    fn test_divergence_at_depth_0() {
+        // First difference at the very first level (immediate divergence)
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            index_bits_s,
+            index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_divergence_at_depth(100, 50, 30, 0);
+
+        // Verify divergence is at expected depth
+        let first_diff = (0..DEPTH)
+            .find(|&i| index_bits_s[i] != index_bits_r[i])
+            .unwrap();
+        assert_eq!(first_diff, 0, "Expected divergence at depth 0");
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            cs.is_satisfied().unwrap(),
+            "Transfer with divergence at depth 0 should succeed"
+        );
+
+        println!("✓ Divergence at depth 0 works correctly");
+    }
+
+    #[test]
+    fn test_divergence_at_depth_3() {
+        // First difference at middle of tree
+        let divergence_depth = 3;
+        assert!(divergence_depth < DEPTH, "Test requires DEPTH > 3");
+
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            index_bits_s,
+            index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+
+        // Verify divergence is at expected depth
+        let first_diff = (0..DEPTH)
+            .find(|&i| index_bits_s[i] != index_bits_r[i])
+            .unwrap();
+        assert_eq!(
+            first_diff, divergence_depth,
+            "Expected divergence at depth 3"
+        );
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            cs.is_satisfied().unwrap(),
+            "Transfer with divergence at depth 3 should succeed"
+        );
+
+        println!("✓ Divergence at depth 3 works correctly");
+    }
+
+    #[test]
+    fn test_divergence_at_depth_minus_2() {
+        // First difference near the top of tree (DEPTH - 2)
+        let divergence_depth = DEPTH - 2;
+
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            index_bits_s,
+            index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+
+        // Verify divergence is at expected depth
+        let first_diff = (0..DEPTH)
+            .find(|&i| index_bits_s[i] != index_bits_r[i])
+            .unwrap();
+        assert_eq!(
+            first_diff, divergence_depth,
+            "Expected divergence at DEPTH-2"
+        );
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            cs.is_satisfied().unwrap(),
+            "Transfer with divergence at DEPTH-2 should succeed"
+        );
+
+        println!(
+            "✓ Divergence at depth {} (DEPTH-2) works correctly",
+            divergence_depth
+        );
+    }
+
+    #[test]
+    fn test_divergence_at_depth_minus_1() {
+        // First difference at the very top of tree (DEPTH - 1)
+        // This is the latest possible divergence - paths share almost everything
+        let divergence_depth = DEPTH - 1;
+
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            index_bits_s,
+            index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+
+        // Verify divergence is at expected depth
+        let first_diff = (0..DEPTH)
+            .find(|&i| index_bits_s[i] != index_bits_r[i])
+            .unwrap();
+        assert_eq!(
+            first_diff, divergence_depth,
+            "Expected divergence at DEPTH-1"
+        );
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            cs.is_satisfied().unwrap(),
+            "Transfer with divergence at DEPTH-1 should succeed"
+        );
+
+        println!(
+            "✓ Divergence at depth {} (DEPTH-1) works correctly",
+            divergence_depth
+        );
+    }
+
+    // ========================================================================
+    // B. POLARITY REGRESSION TESTS
+    // These catch left/right ordering regressions in conditional_swap
+    // and native generator alignment.
+    // ========================================================================
+
+    #[test]
+    fn test_polarity_single_bit_flip_rejected() {
+        // Create a valid transfer, then flip one index bit without updating paths
+        // This should be rejected because the Merkle path computation will be wrong
+
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            mut index_bits_s,
+            index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_transfer_scenario(100, 50, 30);
+
+        // Flip just one bit in sender's index (breaks left/right ordering)
+        // Find a bit that's currently 0 and flip it to 1 (or vice versa)
+        let flip_idx = 0;
+        index_bits_s[flip_idx] = if index_bits_s[flip_idx] == Fr::ZERO {
+            Fr::ONE
+        } else {
+            Fr::ZERO
+        };
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "Single bit flip in sender index should be rejected (polarity check)"
+        );
+
+        println!("✓ Polarity: single bit flip in sender index correctly rejected");
+    }
+
+    #[test]
+    fn test_polarity_invert_all_sender_bits_rejected() {
+        // Invert ALL bits in sender's index without updating anything else
+        // This simulates a complete polarity inversion
+
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            index_bits_s,
+            index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_transfer_scenario(100, 50, 30);
+
+        // Invert all sender bits
+        let inverted_index_bits_s: [Fr; DEPTH] = index_bits_s
+            .iter()
+            .map(|&b| if b == Fr::ZERO { Fr::ONE } else { Fr::ZERO })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(inverted_index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "Inverting all sender bits should be rejected (polarity check)"
+        );
+
+        println!("✓ Polarity: all bits inverted correctly rejected");
+    }
+
+    #[test]
+    fn test_polarity_swap_sender_receiver_indices_rejected() {
+        // Swap sender and receiver indices (but not leaves/paths)
+        // This tests that index bits are correctly bound to their leaves
+
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            index_bits_s,
+            index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_transfer_scenario(100, 50, 30);
+
+        // Swap the indices (but keep leaves in original position)
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_r), // Swapped!
+            index_bits_r: Some(index_bits_s), // Swapped!
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "Swapping sender/receiver indices should be rejected"
+        );
+
+        println!("✓ Polarity: swapped indices correctly rejected");
+    }
+
+    #[test]
+    fn test_polarity_receiver_bit_flip_rejected() {
+        // Flip one bit in receiver's index without updating paths
+
+        let (
+            leaf_s,
+            leaf_r,
+            path_s,
+            path_r,
+            index_bits_s,
+            mut index_bits_r,
+            amount,
+            old_root,
+            new_root,
+        ) = create_transfer_scenario(100, 50, 30);
+
+        // Flip a bit in receiver's index (choose one that won't make it equal to sender)
+        let flip_idx = 1; // Flip second bit
+        index_bits_r[flip_idx] = if index_bits_r[flip_idx] == Fr::ZERO {
+            Fr::ONE
+        } else {
+            Fr::ZERO
+        };
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "Bit flip in receiver index should be rejected"
+        );
+
+        println!("✓ Polarity: receiver bit flip correctly rejected");
+    }
+
+    // ========================================================================
+    // C. ONE-HOT MISUSE REGRESSION TESTS
+    // These prove that the one-hot constraint is load-bearing.
+    // ========================================================================
+
+    /// Test helper: Manually construct selectors that violate one-hot property
+    /// and verify this breaks the circuit when one-hot isn't enforced.
+    ///
+    /// This test documents that enforce_one_hot is CRITICAL for soundness.
+    #[test]
+    fn test_one_hot_is_load_bearing_documentation() {
+        // This test demonstrates WHY one-hot is necessary by showing what
+        // would happen if selectors weren't properly constrained.
+
+        // If selectors were [0.5, 0.5, 0, 0, ...] instead of one-hot:
+        // - select_from_array would return a weighted average
+        // - update_one_slot would partially update multiple slots
+        // This could allow creating inconsistent state transitions.
+
+        // We can't actually bypass enforce_one_hot in the circuit without
+        // modifying it, but we CAN verify that our first_difference_selectors
+        // always produces valid one-hot outputs for valid inputs.
+
+        let test_cases: Vec<([Fr; DEPTH], [Fr; DEPTH])> = vec![
+            // Case 1: Differ at position 0
+            ([Fr::ZERO; DEPTH], {
+                let mut b = [Fr::ZERO; DEPTH];
+                b[0] = Fr::ONE;
+                b
+            }),
+            // Case 2: Differ at position 3
+            (
+                {
+                    let mut a = [Fr::ZERO; DEPTH];
+                    a[0] = Fr::ONE;
+                    a[1] = Fr::ONE;
+                    a[2] = Fr::ONE;
+                    a
+                },
+                {
+                    let mut b = [Fr::ZERO; DEPTH];
+                    b[0] = Fr::ONE;
+                    b[1] = Fr::ONE;
+                    b[2] = Fr::ONE;
+                    b[3] = Fr::ONE;
+                    b
+                },
+            ),
+            // Case 3: Differ at last position
+            (
+                {
+                    let mut a = [Fr::ZERO; DEPTH];
+                    for elem in a.iter_mut().take(DEPTH - 1) {
+                        *elem = Fr::ONE;
+                    }
+                    a
+                },
+                [Fr::ONE; DEPTH],
+            ),
+        ];
+
+        for (i, (a_bits, b_bits)) in test_cases.iter().enumerate() {
+            let cs = ConstraintSystem::<Fr>::new_ref();
+
+            let a_states: [State; DEPTH] = State::witness_array(&cs, a_bits).unwrap();
+            let b_states: [State; DEPTH] = State::witness_array(&cs, b_bits).unwrap();
+
+            let (selectors, found) = first_difference_selectors(&cs, &a_states, &b_states).unwrap();
+
+            // Verify exactly one selector is 1
+            let sum: Fr = selectors.iter().map(|s| s.val()).sum();
+            assert_eq!(sum, Fr::ONE, "Case {}: selectors must sum to 1", i);
+
+            // Verify each selector is binary
+            for (j, s) in selectors.iter().enumerate() {
+                assert!(
+                    s.val() == Fr::ZERO || s.val() == Fr::ONE,
+                    "Case {}: selector {} must be binary, got {:?}",
+                    i,
+                    j,
+                    s.val()
+                );
+            }
+
+            // Verify found is 1
+            assert_eq!(found.val(), Fr::ONE, "Case {}: found must be 1", i);
+
+            // Verify the one-hot constraint is satisfied
+            enforce_one_hot(&cs, &selectors).unwrap();
+            assert!(
+                cs.is_satisfied().unwrap(),
+                "Case {}: constraints must be satisfied",
+                i
+            );
+        }
+
+        println!("✓ One-hot: first_difference_selectors always produces valid one-hot");
+    }
+
+    #[test]
+    fn test_one_hot_multi_select_attack_blocked() {
+        // This test verifies that if an attacker tried to set multiple selectors to 1
+        // (which would allow selecting/updating multiple values simultaneously),
+        // the one-hot constraint would catch it.
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+
+        // Create "malicious" selectors where two positions are 1
+        let mut malicious_vals = [Fr::ZERO; DEPTH];
+        malicious_vals[0] = Fr::ONE;
+        malicious_vals[1] = Fr::ONE; // TWO positions are 1!
+
+        let selectors: [State; DEPTH] = State::witness_array(&cs, &malicious_vals).unwrap();
+
+        // Try to enforce one-hot on these malicious selectors
+        enforce_one_hot(&cs, &selectors).unwrap();
+
+        // The constraint system should NOT be satisfied
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "Multi-select (two 1s) should be rejected by one-hot constraint"
+        );
+
+        println!("✓ One-hot: multi-select attack (two 1s) correctly blocked");
+    }
+
+    #[test]
+    fn test_one_hot_zero_select_attack_blocked() {
+        // This test verifies that if an attacker tried to set ALL selectors to 0
+        // (which would mean no update happens), the one-hot constraint catches it.
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+
+        // All zeros - no selection at all
+        let malicious_vals = [Fr::ZERO; DEPTH];
+        let selectors: [State; DEPTH] = State::witness_array(&cs, &malicious_vals).unwrap();
+
+        enforce_one_hot(&cs, &selectors).unwrap();
+
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "Zero-select (all 0s) should be rejected by one-hot constraint"
+        );
+
+        println!("✓ One-hot: zero-select attack (all 0s) correctly blocked");
+    }
+
+    #[test]
+    fn test_one_hot_fractional_attack_blocked() {
+        // This test verifies that non-binary selector values are rejected.
+        // An attacker might try to use fractional values to partially update.
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+
+        // Try fractional values that sum to 1
+        let half = Fr::ONE.double().inverse().unwrap(); // 0.5 in the field
+        let mut fractional_vals = [Fr::ZERO; DEPTH];
+        fractional_vals[0] = half;
+        fractional_vals[1] = half; // 0.5 + 0.5 = 1, but not binary!
+
+        let selectors: [State; DEPTH] = State::witness_array(&cs, &fractional_vals).unwrap();
+
+        enforce_one_hot(&cs, &selectors).unwrap();
+
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "Fractional selectors should be rejected by one-hot constraint"
+        );
+
+        println!("✓ One-hot: fractional attack (0.5 + 0.5) correctly blocked");
+    }
+
+    #[test]
+    fn test_one_hot_valid_cases() {
+        // Verify that all valid one-hot vectors ARE accepted
+
+        for active_idx in 0..DEPTH {
+            let cs = ConstraintSystem::<Fr>::new_ref();
+
+            let mut vals = [Fr::ZERO; DEPTH];
+            vals[active_idx] = Fr::ONE;
+
+            let selectors: [State; DEPTH] = State::witness_array(&cs, &vals).unwrap();
+
+            enforce_one_hot(&cs, &selectors).unwrap();
+
+            assert!(
+                cs.is_satisfied().unwrap(),
+                "Valid one-hot with 1 at position {} should be accepted",
+                active_idx
+            );
+        }
+
+        println!("✓ One-hot: all {} valid one-hot vectors accepted", DEPTH);
+    }
+
+    // ========================================================================
+    // ADDITIONAL EDGE CASE TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_divergence_depths_comprehensive() {
+        // Run transfers for ALL possible divergence depths
+        // This provides complete coverage of the spine/patching logic
+
+        for divergence_depth in 0..DEPTH {
+            let (
+                leaf_s,
+                leaf_r,
+                path_s,
+                path_r,
+                index_bits_s,
+                index_bits_r,
+                amount,
+                old_root,
+                new_root,
+            ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+
+            let circuit = MerkleTransferKernelCircuit {
+                leaf_s: Some(leaf_s),
+                leaf_r: Some(leaf_r),
+                path_s: Some(path_s),
+                path_r: Some(path_r),
+                index_bits_s: Some(index_bits_s),
+                index_bits_r: Some(index_bits_r),
+                amount: Some(amount),
+                old_root: Some(old_root),
+                new_root: Some(new_root),
+            };
+
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            circuit.generate_constraints(cs.clone()).unwrap();
+
+            assert!(
+                cs.is_satisfied().unwrap(),
+                "Divergence at depth {} should succeed",
+                divergence_depth
+            );
+        }
+
+        println!("✓ All {} divergence depths work correctly", DEPTH);
+    }
+
+    #[test]
+    fn test_wrong_divergence_at_various_depths() {
+        // For each valid divergence depth, verify that patching the WRONG
+        // slot is rejected
+
+        for divergence_depth in 1..DEPTH {
+            // Create valid scenario
+            let (
+                leaf_s,
+                leaf_r,
+                path_s,
+                path_r,
+                index_bits_s,
+                index_bits_r,
+                amount,
+                old_root,
+                _new_root,
+            ) = create_divergence_at_depth(100, 50, 30, divergence_depth);
+
+            // Compute what the circuit would compute
+            let leaf_s_updated = leaf_s - amount;
+            let leaf_r_updated = leaf_r + amount;
+            let spine = compute_spine(leaf_s_updated, &path_s, &index_bits_s);
+
+            // Patch the WRONG slot (one before the correct one)
+            let wrong_slot = divergence_depth - 1;
+            let mut wrong_path_r = path_r;
+            wrong_path_r[wrong_slot] = spine[divergence_depth]; // Wrong slot!
+
+            let malicious_new_root =
+                compute_native_root(leaf_r_updated, &wrong_path_r, &index_bits_r);
+
+            let circuit = MerkleTransferKernelCircuit {
+                leaf_s: Some(leaf_s),
+                leaf_r: Some(leaf_r),
+                path_s: Some(path_s),
+                path_r: Some(path_r),
+                index_bits_s: Some(index_bits_s),
+                index_bits_r: Some(index_bits_r),
+                amount: Some(amount),
+                old_root: Some(old_root),
+                new_root: Some(malicious_new_root),
+            };
+
+            let cs = ConstraintSystem::<Fr>::new_ref();
+            circuit.generate_constraints(cs.clone()).unwrap();
+
+            assert!(
+                !cs.is_satisfied().unwrap(),
+                "Wrong patch slot at divergence depth {} should be rejected",
+                divergence_depth
+            );
+        }
+
+        println!("✓ Wrong patch slot rejected at all divergence depths");
+    }
 }
