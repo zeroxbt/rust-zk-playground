@@ -46,40 +46,28 @@ pub fn enforce_bit_array<const T: usize>(
 
     Ok(())
 }
-
-/// Conditional swap using one multiplication:
-///   m = b * (sib - cur)
-///   left  = cur + m
-///   right = sib - m
 pub fn conditional_swap(
     cs: &ConstraintSystemRef<Fr>,
     cur: State,
     sib: State,
     b: State,
 ) -> Result<(State, State), SynthesisError> {
-    // Enforce: b * (sib - cur) = m
-    let t_lc = LinearCombination::from(sib.var()) + (-Fr::ONE, cur.var());
-    let m = State::witness(cs, b.val() * (sib.val() - cur.val()))?;
+    let left_val = cur.val() * (Fr::ONE - b.val()) + sib.val() * b.val();
+    let right_val = sib.val() * (Fr::ONE - b.val()) + cur.val() * b.val();
+
+    let left = State::witness(cs, left_val)?;
+    let right = State::witness(cs, right_val)?;
+
     cs.enforce_constraint(
+        LinearCombination::from(sib.var()) + (-Fr::ONE, cur.var()),
         LinearCombination::from(b.var()),
-        t_lc,
-        LinearCombination::from(m.var()),
+        LinearCombination::from(left.var()) + (-Fr::ONE, cur.var()),
     )?;
 
-    // Enforce: left = cur + m
-    let left = State::witness(cs, cur.val() + m.val())?;
     cs.enforce_constraint(
-        LinearCombination::from(cur.var()) + (Fr::ONE, m.var()),
-        LinearCombination::from(Variable::One),
-        LinearCombination::from(left.var()),
-    )?;
-
-    // Enforce: right = sib - m
-    let right = State::witness(cs, sib.val() - m.val())?;
-    cs.enforce_constraint(
-        LinearCombination::from(sib.var()) + (-Fr::ONE, m.var()),
-        LinearCombination::from(Variable::One),
-        LinearCombination::from(right.var()),
+        LinearCombination::from(sib.var()) + (-Fr::ONE, cur.var()),
+        LinearCombination::from(b.var()),
+        LinearCombination::from(sib.var()) + (-Fr::ONE, right.var()),
     )?;
 
     Ok((left, right))
@@ -169,8 +157,6 @@ pub fn first_difference_selectors<const T: usize>(
             LinearCombination::from(Variable::One) + (-Fr::ONE, z.var()),
             LinearCombination::from(found.var()) + (-Fr::ONE, old_found.var()),
         )?;
-
-        enforce_bit(cs, found)?;
     }
 
     Ok((selectors, found))
