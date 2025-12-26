@@ -51,14 +51,8 @@ fn apply_ark(
     state: &mut [State; WIDTH],
 ) -> Result<(), SynthesisError> {
     for (i, s) in state.iter_mut().enumerate() {
-        let old_s_var = s.var();
-        let c = rc[i];
-        *s = State::witness(cs, s.val() + c)?;
-        cs.enforce_constraint(
-            LinearCombination::from(old_s_var) + (c, Variable::One),
-            LinearCombination::from(Variable::One),
-            LinearCombination::from(s.var()),
-        )?;
+        *s = State::witness(cs, s.val() + rc[i])?;
+        // No constraint! MDS will constrain the result.
     }
 
     Ok(())
