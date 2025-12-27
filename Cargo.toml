@@ -1,12 +1,13 @@
 [workspace]
 members = [
-    "01-arithmetic", 
+    "01-arithmetic",
     "02-range-check",
     "03-r1cs-control-flow",
     "04-hash-preimage",
-    "05-merkle-membership", 
-    "06-merkle-update", 
-    "07-merkle-ordered-update", 
-    "08-merkle-transfer-kernel"
-    ]
+    "05-merkle-membership",
+    "06-merkle-update",
+    "07-merkle-ordered-update",
+    "08-merkle-transfer-kernel",
+    "09-nullifiers",
+]
 resolver = "2"
