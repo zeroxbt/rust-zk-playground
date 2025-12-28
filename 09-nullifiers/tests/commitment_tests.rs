@@ -1,6 +1,8 @@
 use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, UniformRand};
 use ark_std::test_rng;
+use hash_preimage::sponge::gadget::State;
+use nullifiers::commitment::spec::LeafState;
 use nullifiers::commitment::{native::create_commitment, spec::LeafData};
 use rand::seq::SliceRandom;
 
@@ -78,7 +80,15 @@ fn gadget_consistency_with_native() {
         let native_result = create_commitment_native(&leaf);
 
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let gadget_result = create_commitment_gadget(&cs, &leaf).unwrap();
+        let gadget_result = create_commitment_gadget(
+            &cs,
+            &LeafState::new(
+                State::witness(&cs, leaf.secret()).unwrap(),
+                State::witness(&cs, leaf.balance()).unwrap(),
+                State::witness(&cs, leaf.salt()).unwrap(),
+            ),
+        )
+        .unwrap();
 
         assert_eq!(gadget_result.val(), native_result);
         assert!(cs.is_satisfied().unwrap());
@@ -91,7 +101,15 @@ fn gadget_constraints_satisfied() {
     let leaf = LeafData::new(Fr::rand(&mut rng), Fr::rand(&mut rng), Fr::rand(&mut rng));
 
     let cs = ConstraintSystem::<Fr>::new_ref();
-    let _commitment = create_commitment_gadget(&cs, &leaf).unwrap();
+    let _commitment = create_commitment_gadget(
+        &cs,
+        &LeafState::new(
+            State::witness(&cs, leaf.secret()).unwrap(),
+            State::witness(&cs, leaf.balance()).unwrap(),
+            State::witness(&cs, leaf.salt()).unwrap(),
+        ),
+    )
+    .unwrap();
 
     assert!(cs.is_satisfied().unwrap());
     println!("Commitment circuit constraints: {}", cs.num_constraints());
@@ -103,7 +121,15 @@ fn gadget_zero_balance() {
     let leaf = LeafData::new(Fr::rand(&mut rng), Fr::ZERO, Fr::rand(&mut rng));
 
     let cs = ConstraintSystem::<Fr>::new_ref();
-    let gadget_result = create_commitment_gadget(&cs, &leaf).unwrap();
+    let gadget_result = create_commitment_gadget(
+        &cs,
+        &LeafState::new(
+            State::witness(&cs, leaf.secret()).unwrap(),
+            State::witness(&cs, leaf.balance()).unwrap(),
+            State::witness(&cs, leaf.salt()).unwrap(),
+        ),
+    )
+    .unwrap();
     let native_result = create_commitment_native(&leaf);
 
     assert_eq!(gadget_result.val(), native_result);
@@ -115,7 +141,15 @@ fn gadget_all_zero_inputs() {
     let leaf = LeafData::new(Fr::ZERO, Fr::ZERO, Fr::ZERO);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
-    let gadget_result = create_commitment_gadget(&cs, &leaf).unwrap();
+    let gadget_result = create_commitment_gadget(
+        &cs,
+        &LeafState::new(
+            State::witness(&cs, leaf.secret()).unwrap(),
+            State::witness(&cs, leaf.balance()).unwrap(),
+            State::witness(&cs, leaf.salt()).unwrap(),
+        ),
+    )
+    .unwrap();
     let native_result = create_commitment_native(&leaf);
 
     assert_eq!(gadget_result.val(), native_result);

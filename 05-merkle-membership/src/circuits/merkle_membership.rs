@@ -33,7 +33,7 @@ impl ConstraintSynthesizer<Fr> for MerkleMembershipCircuit {
         } else {
             self.path.ok_or(SynthesisError::AssignmentMissing)?
         };
-        let path = State::witness_array(&cs, &path_vals)?;
+        let path: [State; DEPTH] = State::witness_array(&cs, &path_vals)?;
 
         let index_bits_vals = if is_setup {
             [Fr::ZERO; DEPTH]

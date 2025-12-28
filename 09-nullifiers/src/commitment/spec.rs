@@ -1,5 +1,6 @@
 use ark_bls12_381::Fr;
 use ark_ff::MontFp;
+use hash_preimage::sponge::gadget::State;
 
 pub const COMMITMENT_DST: Fr = MontFp!("23");
 
@@ -28,6 +29,35 @@ impl LeafData {
     }
 
     pub fn salt(&self) -> Fr {
+        self.salt
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct LeafState {
+    secret: State,
+    balance: State,
+    salt: State,
+}
+
+impl LeafState {
+    pub fn new(secret: State, balance: State, salt: State) -> Self {
+        Self {
+            secret,
+            balance,
+            salt,
+        }
+    }
+
+    pub fn secret(&self) -> State {
+        self.secret
+    }
+
+    pub fn balance(&self) -> State {
+        self.balance
+    }
+
+    pub fn salt(&self) -> State {
         self.salt
     }
 }

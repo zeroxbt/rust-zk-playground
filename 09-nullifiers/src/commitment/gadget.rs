@@ -5,14 +5,18 @@ use hash_preimage::{
     sponge::gadget::{SpongeGadget, State},
 };
 
-use crate::commitment::spec::{COMMITMENT_DST, LeafData};
+use crate::commitment::spec::{COMMITMENT_DST, LeafState};
 
 pub fn create_commitment(
     cs: &ConstraintSystemRef<Fr>,
-    leaf: &LeafData,
+    leaf: &LeafState,
 ) -> Result<State, SynthesisError> {
     let sponge = SpongeGadget::<PoseidonPermutation, 3, 2>::default();
-    let msg: [State; 3] = State::witness_array(cs, &[leaf.secret(), leaf.balance(), leaf.salt()])?;
 
-    sponge.hash_with_dst(cs, &msg, Some(COMMITMENT_DST), 1)
+    sponge.hash_with_dst(
+        cs,
+        &[leaf.secret(), leaf.balance(), leaf.salt()],
+        Some(COMMITMENT_DST),
+        1,
+    )
 }

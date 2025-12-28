@@ -5,15 +5,15 @@ use hash_preimage::{
     sponge::gadget::{SpongeGadget, State},
 };
 
-use crate::merkle::spec::{DEPTH, MERKLE_NODE_DST};
+use crate::merkle::spec::MERKLE_NODE_DST;
 use ark_ff::Field;
 
-pub fn compute_root(
+pub fn compute_root<const T: usize>(
     cs: &ConstraintSystemRef<Fr>,
     sponge: &SpongeGadget<PoseidonPermutation, 3, 2>,
     leaf: State,
-    path: &[State; DEPTH],
-    index_bits: &[State; DEPTH],
+    path: &[State; T],
+    index_bits: &[State; T],
 ) -> Result<State, SynthesisError> {
     let mut cur = leaf;
     for (&sib, &b) in path.iter().zip(index_bits.iter()) {

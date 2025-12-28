@@ -37,7 +37,7 @@ impl<const K: usize> ConstraintSynthesizer<Fr> for MerkleOrderedUpdateCircuit<K>
         } else {
             self.path.ok_or(SynthesisError::AssignmentMissing)?
         };
-        let path = State::witness_array(&cs, &path_vals)?;
+        let path: [State; DEPTH] = State::witness_array(&cs, &path_vals)?;
 
         let index_bits_vals = if is_setup {
             [Fr::ZERO; DEPTH]

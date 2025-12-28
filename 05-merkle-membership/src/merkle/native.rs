@@ -1,13 +1,13 @@
 use ark_bls12_381::Fr;
 use hash_preimage::sponge::native::{PermutationNative, SpongeNative};
 
-use crate::merkle::spec::{DEPTH, MERKLE_NODE_DST};
+use crate::merkle::spec::MERKLE_NODE_DST;
 
-pub fn compute_root<P: PermutationNative<3>>(
+pub fn compute_root<const T: usize, P: PermutationNative<3>>(
     sponge: &SpongeNative<P, 3, 2>,
     leaf: Fr,
-    path: &[Fr; DEPTH],
-    index_bits: &[bool; DEPTH],
+    path: &[Fr; T],
+    index_bits: &[bool; T],
 ) -> Fr {
     let mut cur = leaf;
     for (&sib, &b) in path.iter().zip(index_bits.iter()) {
