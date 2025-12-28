@@ -9,5 +9,6 @@ members = [
     "07-merkle-ordered-update",
     "08-merkle-transfer-kernel",
     "09-nullifiers",
+    "10-merkle-non-membership",
 ]
 resolver = "2"
