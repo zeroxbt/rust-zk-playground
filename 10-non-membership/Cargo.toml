@@ -1,5 +1,5 @@
 [package]
-name = "merkle-non-membership"
+name = "non-membership"
 version = "0.1.0"
 edition = "2024"
 
