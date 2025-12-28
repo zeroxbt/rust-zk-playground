@@ -1,5 +1,5 @@
 use ark_bls12_381::Fr;
-use ark_ff::{AdditiveGroup, Field, UniformRand};
+use ark_ff::{AdditiveGroup, UniformRand};
 use ark_std::test_rng;
 use nullifiers::commitment::{native::create_commitment, spec::LeafData};
 use rand::seq::SliceRandom;
