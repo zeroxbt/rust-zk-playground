@@ -1,26 +1,26 @@
+use ::nullifiers::nullifier::gadget;
 use ark_bls12_381::Fr;
 use ark_ff::UniformRand;
+use ark_relations::r1cs::ConstraintSystem;
 use ark_std::test_rng;
-use nullifiers::nullifier::native::{bits_to_field, derive_nullifier};
+use hash_preimage::sponge::gadget::State;
+use nullifiers::nullifier::native;
 use rand::RngCore;
 
 const DEPTH: usize = 16;
 
 #[test]
 fn bits_to_field_correctness() {
-    // 5 = 0b101 = [1, 0, 1] in little-endian
     let bits = [true, false, true];
-    let result: Fr = bits_to_field(&bits);
+    let result: Fr = native::bits_to_field(&bits);
     assert_eq!(result, Fr::from(5u64));
 
-    // 0 = [0, 0, 0]
     let bits = [false, false, false];
-    let result: Fr = bits_to_field(&bits);
+    let result: Fr = native::bits_to_field(&bits);
     assert_eq!(result, Fr::from(0u64));
 
-    // 7 = 0b111 = [1, 1, 1]
     let bits = [true, true, true];
-    let result: Fr = bits_to_field(&bits);
+    let result: Fr = native::bits_to_field(&bits);
     assert_eq!(result, Fr::from(7u64));
 }
 
@@ -37,8 +37,8 @@ fn determinism() {
         let index_bits = random_index_bits::<DEPTH>(&mut rng);
 
         assert_eq!(
-            derive_nullifier(secret, &index_bits),
-            derive_nullifier(secret, &index_bits)
+            native::derive_nullifier(secret, &index_bits),
+            native::derive_nullifier(secret, &index_bits)
         );
     }
 }
@@ -53,8 +53,8 @@ fn sensitivity_to_secret() {
         let index_bits = random_index_bits::<DEPTH>(&mut rng);
 
         assert_ne!(
-            derive_nullifier(secret1, &index_bits),
-            derive_nullifier(secret2, &index_bits)
+            native::derive_nullifier(secret1, &index_bits),
+            native::derive_nullifier(secret2, &index_bits)
         );
     }
 }
@@ -72,8 +72,8 @@ fn sensitivity_to_index() {
         index_bits2[flip_pos] = !index_bits2[flip_pos];
 
         assert_ne!(
-            derive_nullifier(secret, &index_bits1),
-            derive_nullifier(secret, &index_bits2)
+            native::derive_nullifier(secret, &index_bits1),
+            native::derive_nullifier(secret, &index_bits2)
         );
     }
 }
@@ -92,8 +92,8 @@ fn same_secret_different_index_produces_different_nullifiers() {
         }
 
         assert_ne!(
-            derive_nullifier(secret, &index_bits1),
-            derive_nullifier(secret, &index_bits2)
+            native::derive_nullifier(secret, &index_bits1),
+            native::derive_nullifier(secret, &index_bits2)
         );
     }
 }
@@ -112,8 +112,8 @@ fn different_secret_same_index_produces_different_nullifiers() {
         }
 
         assert_ne!(
-            derive_nullifier(secret1, &index_bits),
-            derive_nullifier(secret2, &index_bits)
+            native::derive_nullifier(secret1, &index_bits),
+            native::derive_nullifier(secret2, &index_bits)
         );
     }
 }
@@ -126,7 +126,10 @@ fn non_zero_output() {
         let secret = Fr::rand(&mut rng);
         let index_bits = random_index_bits::<DEPTH>(&mut rng);
 
-        assert_ne!(derive_nullifier(secret, &index_bits), Fr::from(0u64));
+        assert_ne!(
+            native::derive_nullifier(secret, &index_bits),
+            Fr::from(0u64)
+        );
     }
 }
 
@@ -136,7 +139,7 @@ fn all_zero_index_works() {
     let secret = Fr::rand(&mut rng);
     let index_bits = [false; DEPTH];
 
-    let nullifier = derive_nullifier(secret, &index_bits);
+    let nullifier = native::derive_nullifier(secret, &index_bits);
     assert_ne!(nullifier, Fr::from(0u64));
 }
 
@@ -146,6 +149,116 @@ fn all_one_index_works() {
     let secret = Fr::rand(&mut rng);
     let index_bits = [true; DEPTH];
 
-    let nullifier = derive_nullifier(secret, &index_bits);
+    let nullifier = native::derive_nullifier(secret, &index_bits);
     assert_ne!(nullifier, Fr::from(0u64));
+}
+
+#[test]
+fn bits_to_field_consistency_with_native() {
+    let mut rng = test_rng();
+
+    for _ in 0..20 {
+        let bits = random_index_bits::<DEPTH>(&mut rng);
+        let native_result = native::bits_to_field(&bits);
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let bit_states: [State; DEPTH] = std::array::from_fn(|i| {
+            State::witness(
+                &cs,
+                if bits[i] {
+                    Fr::from(1u64)
+                } else {
+                    Fr::from(0u64)
+                },
+            )
+            .unwrap()
+        });
+
+        let gadget_result = gadget::bits_to_field(&cs, &bit_states).unwrap();
+
+        assert_eq!(gadget_result.val(), native_result);
+        assert!(cs.is_satisfied().unwrap());
+    }
+}
+
+#[test]
+fn derive_nullifier_consistency_with_native() {
+    let mut rng = test_rng();
+
+    for _ in 0..10 {
+        let secret = Fr::rand(&mut rng);
+        let bits = random_index_bits::<DEPTH>(&mut rng);
+
+        let native_result = native::derive_nullifier(secret, &bits);
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let secret_state = State::witness(&cs, secret).unwrap();
+        let bit_states: [State; DEPTH] = std::array::from_fn(|i| {
+            State::witness(
+                &cs,
+                if bits[i] {
+                    Fr::from(1u64)
+                } else {
+                    Fr::from(0u64)
+                },
+            )
+            .unwrap()
+        });
+
+        let gadget_result = gadget::derive_nullifier(&cs, secret_state, &bit_states).unwrap();
+
+        assert_eq!(gadget_result.val(), native_result);
+        assert!(cs.is_satisfied().unwrap());
+    }
+}
+
+#[test]
+fn derive_nullifier_constraints_satisfied() {
+    let mut rng = test_rng();
+    let secret = Fr::rand(&mut rng);
+    let bits = random_index_bits::<DEPTH>(&mut rng);
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    let secret_state = State::witness(&cs, secret).unwrap();
+    let bit_states: [State; DEPTH] = std::array::from_fn(|i| {
+        State::witness(
+            &cs,
+            if bits[i] {
+                Fr::from(1u64)
+            } else {
+                Fr::from(0u64)
+            },
+        )
+        .unwrap()
+    });
+
+    let _nullifier = gadget::derive_nullifier(&cs, secret_state, &bit_states).unwrap();
+
+    assert!(cs.is_satisfied().unwrap());
+    println!("Nullifier circuit constraints: {}", cs.num_constraints());
+}
+
+#[test]
+fn bits_to_field_all_zeros() {
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    let bit_states: [State; DEPTH] =
+        std::array::from_fn(|_| State::witness(&cs, Fr::from(0u64)).unwrap());
+
+    let result = gadget::bits_to_field(&cs, &bit_states).unwrap();
+
+    assert_eq!(result.val(), Fr::from(0u64));
+    assert!(cs.is_satisfied().unwrap());
+}
+
+#[test]
+fn bits_to_field_all_ones() {
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    let bit_states: [State; DEPTH] =
+        std::array::from_fn(|_| State::witness(&cs, Fr::from(1u64)).unwrap());
+
+    let result = gadget::bits_to_field(&cs, &bit_states).unwrap();
+
+    let expected = Fr::from((1u64 << DEPTH) - 1);
+    assert_eq!(result.val(), expected);
+    assert!(cs.is_satisfied().unwrap());
 }
