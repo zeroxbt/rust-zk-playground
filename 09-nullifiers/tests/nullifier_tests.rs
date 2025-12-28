@@ -9,6 +9,14 @@ use rand::RngCore;
 
 const DEPTH: usize = 16;
 
+fn random_index_bits<const T: usize>(rng: &mut impl RngCore) -> [bool; T] {
+    [0; T].map(|_| (rng.next_u32() & 1) == 1)
+}
+
+// ============================================
+// Native tests
+// ============================================
+
 #[test]
 fn bits_to_field_correctness() {
     let bits = [true, false, true];
@@ -22,10 +30,6 @@ fn bits_to_field_correctness() {
     let bits = [true, true, true];
     let result: Fr = native::bits_to_field(&bits);
     assert_eq!(result, Fr::from(7u64));
-}
-
-fn random_index_bits<const T: usize>(rng: &mut impl RngCore) -> [bool; T] {
-    [0; T].map(|_| (rng.next_u32() & 1) == 1)
 }
 
 #[test]
@@ -152,6 +156,10 @@ fn all_one_index_works() {
     let nullifier = native::derive_nullifier(secret, &index_bits);
     assert_ne!(nullifier, Fr::from(0u64));
 }
+
+// ============================================
+// Gadget tests
+// ============================================
 
 #[test]
 fn bits_to_field_consistency_with_native() {

@@ -4,6 +4,10 @@ use ark_std::test_rng;
 use nullifiers::commitment::{native::create_commitment, spec::LeafData};
 use rand::seq::SliceRandom;
 
+// ============================================
+// Native tests
+// ============================================
+
 #[test]
 fn determinism() {
     let mut rng = test_rng();
@@ -51,4 +55,69 @@ fn non_zero_output() {
 
         assert_ne!(create_commitment(&leaf), Fr::ZERO);
     }
+}
+
+// ============================================
+// Gadget tests
+// ============================================
+
+use ark_relations::r1cs::ConstraintSystem;
+use nullifiers::commitment::gadget::create_commitment as create_commitment_gadget;
+use nullifiers::commitment::native::create_commitment as create_commitment_native;
+
+#[test]
+fn gadget_consistency_with_native() {
+    let mut rng = test_rng();
+
+    for _ in 0..10 {
+        let secret = Fr::rand(&mut rng);
+        let balance = Fr::rand(&mut rng);
+        let salt = Fr::rand(&mut rng);
+        let leaf = LeafData::new(secret, balance, salt);
+
+        let native_result = create_commitment_native(&leaf);
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let gadget_result = create_commitment_gadget(&cs, &leaf).unwrap();
+
+        assert_eq!(gadget_result.val(), native_result);
+        assert!(cs.is_satisfied().unwrap());
+    }
+}
+
+#[test]
+fn gadget_constraints_satisfied() {
+    let mut rng = test_rng();
+    let leaf = LeafData::new(Fr::rand(&mut rng), Fr::rand(&mut rng), Fr::rand(&mut rng));
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    let _commitment = create_commitment_gadget(&cs, &leaf).unwrap();
+
+    assert!(cs.is_satisfied().unwrap());
+    println!("Commitment circuit constraints: {}", cs.num_constraints());
+}
+
+#[test]
+fn gadget_zero_balance() {
+    let mut rng = test_rng();
+    let leaf = LeafData::new(Fr::rand(&mut rng), Fr::ZERO, Fr::rand(&mut rng));
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    let gadget_result = create_commitment_gadget(&cs, &leaf).unwrap();
+    let native_result = create_commitment_native(&leaf);
+
+    assert_eq!(gadget_result.val(), native_result);
+    assert!(cs.is_satisfied().unwrap());
+}
+
+#[test]
+fn gadget_all_zero_inputs() {
+    let leaf = LeafData::new(Fr::ZERO, Fr::ZERO, Fr::ZERO);
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    let gadget_result = create_commitment_gadget(&cs, &leaf).unwrap();
+    let native_result = create_commitment_native(&leaf);
+
+    assert_eq!(gadget_result.val(), native_result);
+    assert!(cs.is_satisfied().unwrap());
 }

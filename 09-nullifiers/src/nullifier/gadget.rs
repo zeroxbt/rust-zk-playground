@@ -15,14 +15,12 @@ pub fn derive_nullifier<const T: usize>(
 ) -> Result<State, SynthesisError> {
     let sponge = SpongeGadget::<PoseidonPermutation, 3, 2>::default();
 
-    let hash = sponge.hash_with_dst(
+    sponge.hash_with_dst(
         cs,
         &[secret, bits_to_field(cs, index_bits)?],
         Some(NULLIFIER_DST),
         1,
-    )?;
-
-    Ok(hash)
+    )
 }
 
 pub fn bits_to_field(
