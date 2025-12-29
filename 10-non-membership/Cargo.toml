@@ -14,3 +14,4 @@ merkle-membership = { path = "../05-merkle-membership" }
 rand = "0.8"
 rand_core = "0.6"
 ark-std = "0.5.0"
+ark-groth16 = "0.5.0"

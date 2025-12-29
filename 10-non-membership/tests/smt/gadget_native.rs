@@ -1,5 +1,5 @@
 use ark_bls12_381::Fr;
-use ark_ff::{AdditiveGroup, Field, UniformRand};
+use ark_ff::{AdditiveGroup, Field};
 use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 use hash_preimage::sponge::gadget::State;
 use rand::{Rng, thread_rng};
@@ -25,11 +25,12 @@ fn satisfies_empty_tree() {
     let tree = SparseMerkleTree::<TEST_DEPTH>::default();
     let nullifier = Fr::from(42u64);
 
+    let proof = tree.prove(nullifier);
     let root = State::witness(&cs, tree.root()).unwrap();
     let nullifier_state = State::witness(&cs, nullifier).unwrap();
-    let proof = tree.prove(nullifier);
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
 
-    verify_non_membership(&cs, root, nullifier_state, &proof).unwrap();
+    verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
 
     assert!(
         cs.is_satisfied().unwrap(),
@@ -51,8 +52,9 @@ fn satisfies_absent_nullifier() {
 
     let root = State::witness(&cs, tree.root()).unwrap();
     let nullifier_state = State::witness(&cs, absent).unwrap();
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
 
-    verify_non_membership(&cs, root, nullifier_state, &proof).unwrap();
+    verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
 
     assert!(
         cs.is_satisfied().unwrap(),
@@ -75,8 +77,9 @@ fn satisfies_multiple_absent() {
 
         let root = State::witness(&cs, tree.root()).unwrap();
         let nullifier_state = State::witness(&cs, absent).unwrap();
+        let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
 
-        verify_non_membership(&cs, root, nullifier_state, &proof).unwrap();
+        verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
 
         assert!(
             cs.is_satisfied().unwrap(),
@@ -92,7 +95,8 @@ fn satisfies_random_absent() {
     let mut tree = SparseMerkleTree::<TEST_DEPTH>::default();
 
     for _ in 0..10 {
-        tree.insert(Fr::rand(&mut rng));
+        let val = Fr::from(rng.r#gen::<u16>() as u64);
+        tree.insert(val);
     }
 
     for _ in 0..5 {
@@ -103,8 +107,9 @@ fn satisfies_random_absent() {
 
             let root = State::witness(&cs, tree.root()).unwrap();
             let nullifier_state = State::witness(&cs, absent).unwrap();
+            let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
 
-            verify_non_membership(&cs, root, nullifier_state, &proof).unwrap();
+            verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
 
             assert!(
                 cs.is_satisfied().unwrap(),
@@ -130,7 +135,9 @@ fn consistent_with_native_empty_tree() {
     let cs = setup_cs();
     let root_state = State::witness(&cs, root).unwrap();
     let nullifier_state = State::witness(&cs, nullifier).unwrap();
-    verify_non_membership(&cs, root_state, nullifier_state, &proof).unwrap();
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
+
+    verify_non_membership(&cs, root_state, nullifier_state, &path).unwrap();
     let gadget_result = cs.is_satisfied().unwrap();
 
     assert_eq!(
@@ -154,7 +161,9 @@ fn consistent_with_native_non_empty_tree() {
     let cs = setup_cs();
     let root_state = State::witness(&cs, root).unwrap();
     let nullifier_state = State::witness(&cs, absent).unwrap();
-    verify_non_membership(&cs, root_state, nullifier_state, &proof).unwrap();
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
+
+    verify_non_membership(&cs, root_state, nullifier_state, &path).unwrap();
     let gadget_result = cs.is_satisfied().unwrap();
 
     assert_eq!(
@@ -177,8 +186,9 @@ fn nullifier_zero() {
     let proof = tree.prove(nullifier);
     let root = State::witness(&cs, tree.root()).unwrap();
     let nullifier_state = State::witness(&cs, nullifier).unwrap();
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
 
-    verify_non_membership(&cs, root, nullifier_state, &proof).unwrap();
+    verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
 
     assert!(
         cs.is_satisfied().unwrap(),
@@ -195,10 +205,30 @@ fn nullifier_one() {
     let proof = tree.prove(nullifier);
     let root = State::witness(&cs, tree.root()).unwrap();
     let nullifier_state = State::witness(&cs, nullifier).unwrap();
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
 
-    verify_non_membership(&cs, root, nullifier_state, &proof).unwrap();
+    verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
 
     assert!(cs.is_satisfied().unwrap(), "should work with one nullifier");
+}
+
+#[test]
+fn nullifier_max_for_depth() {
+    let cs = setup_cs();
+    let tree = SparseMerkleTree::<TEST_DEPTH>::default();
+    let nullifier = Fr::from((1u64 << TEST_DEPTH) - 1);
+
+    let proof = tree.prove(nullifier);
+    let root = State::witness(&cs, tree.root()).unwrap();
+    let nullifier_state = State::witness(&cs, nullifier).unwrap();
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
+
+    verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
+
+    assert!(
+        cs.is_satisfied().unwrap(),
+        "should work with max nullifier for depth"
+    );
 }
 
 // ============================================================================
@@ -214,8 +244,9 @@ fn constraint_count() {
     let proof = tree.prove(nullifier);
     let root = State::witness(&cs, tree.root()).unwrap();
     let nullifier_state = State::witness(&cs, nullifier).unwrap();
+    let path: [State; TEST_DEPTH] = State::witness_array(&cs, &proof.path()).unwrap();
 
-    verify_non_membership(&cs, root, nullifier_state, &proof).unwrap();
+    verify_non_membership(&cs, root, nullifier_state, &path).unwrap();
 
     let num_constraints = cs.num_constraints();
     println!(
