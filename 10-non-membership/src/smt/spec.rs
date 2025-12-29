@@ -26,8 +26,9 @@ impl<const D: usize> NonMembershipProof<D> {
 }
 
 pub fn index_bits<const D: usize>(leaf: Fr) -> [bool; D] {
-    assert!(D >= 256);
+    assert!(D <= 256);
+    let bits = leaf.into_bigint().to_bits_le();
     let mut index_bits = [false; D];
-    index_bits.copy_from_slice(&leaf.into_bigint().to_bits_be());
+    index_bits.copy_from_slice(&bits[..D]);
     index_bits
 }

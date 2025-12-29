@@ -1,6 +1,7 @@
 use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
+use merkle_membership::merkle::spec::MERKLE_NODE_DST;
 
 use crate::smt::{
     spec::{NULLIFIER_MARKER, NonMembershipProof, index_bits},
@@ -19,7 +20,7 @@ impl<const D: usize> Default for SparseMerkleTree<'_, D> {
         let mut cur = Fr::ZERO;
         for _ in 0..=D {
             defaults.push(cur);
-            cur = sponge.hash(&[cur, cur]);
+            cur = sponge.hash_with_dst(&[cur, cur], Some(MERKLE_NODE_DST));
         }
         Self {
             storage: Storage::new(defaults),
@@ -45,7 +46,9 @@ impl<const D: usize> SparseMerkleTree<'_, D> {
             } else {
                 (cur, sib)
             };
-            cur = self.sponge.hash(&[left, right]);
+            cur = self
+                .sponge
+                .hash_with_dst(&[left, right], Some(MERKLE_NODE_DST));
             self.storage.store(level + 1, index_bits, cur);
         }
 
