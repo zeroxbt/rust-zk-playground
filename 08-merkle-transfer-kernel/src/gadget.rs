@@ -1,5 +1,5 @@
 use ark_bls12_381::Fr;
-use ark_ff::{AdditiveGroup, Field};
+use ark_ff::{AdditiveGroup, BigInteger, Field, PrimeField};
 use ark_relations::r1cs::{ConstraintSystemRef, LinearCombination, SynthesisError, Variable};
 use hash_preimage::{
     poseidon::native::PoseidonPermutation,
@@ -213,4 +213,34 @@ pub fn select_from_array<const T: usize>(
     )?;
 
     Ok(acc)
+}
+
+pub fn range_check<const T: usize>(
+    cs: &ConstraintSystemRef<Fr>,
+    s: State,
+) -> Result<(), SynthesisError> {
+    assert!(T <= 256);
+    let bits = &s.val().into_bigint().to_bits_le()[0..T];
+
+    let mut sum_lc = LinearCombination::zero();
+    let mut pow2 = Fr::ONE;
+    let two = Fr::from(2u64);
+    for b in bits {
+        let b = State::witness(cs, if *b { Fr::ONE } else { Fr::ZERO })?;
+        cs.enforce_constraint(
+            LinearCombination::from(b.var()),
+            LinearCombination::from(b.var()) + (-Fr::ONE, Variable::One),
+            LinearCombination::zero(),
+        )?;
+        sum_lc += (pow2, b.var());
+        pow2 *= two;
+    }
+
+    cs.enforce_constraint(
+        sum_lc,
+        LinearCombination::from(Variable::One),
+        LinearCombination::from(s.var()),
+    )?;
+
+    Ok(())
 }

@@ -10,21 +10,21 @@ use hash_preimage::{
 
 use crate::gadget::{
     compute_root_with_spine, enforce_bit_array, enforce_one_hot, first_difference_selectors,
-    select_from_array, update_one_slot,
+    range_check, select_from_array, update_one_slot,
 };
 
 pub const DEPTH: usize = 8;
 
 pub struct MerkleTransferKernelCircuit {
-    leaf_s: Option<Fr>,
-    leaf_r: Option<Fr>,
-    path_s: Option<[Fr; DEPTH]>,
-    path_r: Option<[Fr; DEPTH]>,
-    index_bits_s: Option<[Fr; DEPTH]>,
-    index_bits_r: Option<[Fr; DEPTH]>,
-    amount: Option<Fr>,   // public
-    old_root: Option<Fr>, // public
-    new_root: Option<Fr>, // public
+    pub leaf_s: Option<Fr>,
+    pub leaf_r: Option<Fr>,
+    pub path_s: Option<[Fr; DEPTH]>,
+    pub path_r: Option<[Fr; DEPTH]>,
+    pub index_bits_s: Option<[Fr; DEPTH]>,
+    pub index_bits_r: Option<[Fr; DEPTH]>,
+    pub amount: Option<Fr>,   // public
+    pub old_root: Option<Fr>, // public
+    pub new_root: Option<Fr>, // public
 }
 
 impl ConstraintSynthesizer<Fr> for MerkleTransferKernelCircuit {
@@ -59,6 +59,7 @@ impl ConstraintSynthesizer<Fr> for MerkleTransferKernelCircuit {
 
         let amount = State::input(&cs, self.amount.unwrap_or_default())?;
         let leaf_s_updated = State::witness(&cs, leaf_s.val() - amount.val())?;
+        range_check::<64>(&cs, leaf_s_updated)?;
         cs.enforce_constraint(
             LinearCombination::from(leaf_s_updated.var()),
             LinearCombination::from(Variable::One),
