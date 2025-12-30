@@ -10,5 +10,6 @@ members = [
     "08-merkle-transfer-kernel",
     "09-nullifiers",
     "10-non-membership",
+    "11-signatures",
 ]
 resolver = "2"
