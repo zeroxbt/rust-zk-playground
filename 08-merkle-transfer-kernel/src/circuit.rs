@@ -58,6 +58,7 @@ impl ConstraintSynthesizer<Fr> for MerkleTransferKernelCircuit {
         )?;
 
         let amount = State::input(&cs, self.amount.unwrap_or_default())?;
+        range_check::<64>(&cs, amount)?;
         let leaf_s_updated = State::witness(&cs, leaf_s.val() - amount.val())?;
         range_check::<64>(&cs, leaf_s_updated)?;
         cs.enforce_constraint(
@@ -88,6 +89,7 @@ impl ConstraintSynthesizer<Fr> for MerkleTransferKernelCircuit {
         )?;
 
         let leaf_r_updated = State::witness(&cs, leaf_r.val() + amount.val())?;
+        range_check::<64>(&cs, leaf_r_updated)?;
         cs.enforce_constraint(
             LinearCombination::from(leaf_r_updated.var()),
             LinearCombination::from(Variable::One),

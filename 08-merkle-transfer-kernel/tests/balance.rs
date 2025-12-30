@@ -5,7 +5,9 @@ use merkle_transfer_kernel::circuit::MerkleTransferKernelCircuit;
 
 #[path = "common/mod.rs"]
 mod common;
-use crate::common::{create_transfer_scenario, create_two_leaf_tree};
+use crate::common::{
+    compute_native_root, compute_spine, create_transfer_scenario, create_two_leaf_tree,
+};
 
 // ============================================================================
 // RANGE CHECK TESTS - Verify underflow protection works
@@ -428,4 +430,359 @@ fn test_wrapped_value_not_accepted_as_valid_balance() {
     );
 
     println!("✓ Wrapped balance value correctly rejected");
+}
+
+// ============================================================================
+// RECEIVER OVERFLOW TESTS - Properly constructed to test range check
+// ============================================================================
+
+#[test]
+fn test_receiver_overflow_rejected() {
+    // Receiver balance + amount exceeds 2^64
+    // We compute the "malicious" new_root using the overflowed value
+    // Without range check: would pass. With range check: fails.
+
+    let sender_balance = 100u64;
+    let receiver_balance = u64::MAX - 10; // Very close to max
+    let amount = 50u64; // This causes overflow: (MAX - 10) + 50 wraps in u64
+
+    // We can't use create_transfer_scenario because it uses u64 arithmetic
+    // which would overflow. We need to work with Fr directly.
+
+    let (_, _, path_s, path_r_initial, old_root) =
+        create_two_leaf_tree(sender_balance, receiver_balance);
+
+    let leaf_r = Fr::from(receiver_balance);
+
+    let index_bits_s = [Fr::ZERO; 8];
+    let mut index_bits_r = [Fr::ZERO; 8];
+    index_bits_r[0] = Fr::ONE;
+
+    let amount_fr = Fr::from(amount);
+
+    // Compute updates using field arithmetic (no overflow in Fr)
+    let leaf_s_updated = Fr::from(sender_balance) - amount_fr; // 100 - 50 = 50, valid
+    let leaf_r_updated = Fr::from(receiver_balance) + amount_fr; // Overflows 64 bits but valid in Fr
+
+    // Compute spine for sender
+    let spine = compute_spine(leaf_s_updated, &path_s, &index_bits_s);
+
+    // Update receiver path at divergence point (index 0)
+    let mut path_r_updated = path_r_initial;
+    path_r_updated[0] = spine[0];
+
+    // Compute new_root using the overflowed receiver balance
+    let new_root = compute_native_root(leaf_r_updated, &path_r_updated, &index_bits_r);
+
+    let circuit = MerkleTransferKernelCircuit {
+        leaf_s: Some(Fr::from(sender_balance)),
+        leaf_r: Some(leaf_r),
+        path_s: Some(path_s),
+        path_r: Some(path_r_initial),
+        index_bits_s: Some(index_bits_s),
+        index_bits_r: Some(index_bits_r),
+        amount: Some(amount_fr),
+        old_root: Some(old_root),
+        new_root: Some(new_root),
+    };
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    circuit.generate_constraints(cs.clone()).unwrap();
+
+    assert!(
+        !cs.is_satisfied().unwrap(),
+        "Receiver overflow should be rejected by range check"
+    );
+
+    println!("✓ Receiver overflow correctly rejected");
+}
+
+#[test]
+fn test_receiver_overflow_by_one_rejected() {
+    // Receiver at MAX, adding 1 causes overflow to 2^64
+
+    let sender_balance = 100u64;
+    let receiver_balance = u64::MAX;
+    let amount = 1u64;
+
+    let (_, _, path_s, path_r_initial, old_root) =
+        create_two_leaf_tree(sender_balance, receiver_balance);
+
+    let leaf_r = Fr::from(receiver_balance);
+
+    let index_bits_s = [Fr::ZERO; 8];
+    let mut index_bits_r = [Fr::ZERO; 8];
+    index_bits_r[0] = Fr::ONE;
+
+    let amount_fr = Fr::from(amount);
+
+    let leaf_s_updated = Fr::from(sender_balance) - amount_fr;
+    let leaf_r_updated = Fr::from(receiver_balance) + amount_fr; // MAX + 1 in Fr
+
+    let spine = compute_spine(leaf_s_updated, &path_s, &index_bits_s);
+
+    let mut path_r_updated = path_r_initial;
+    path_r_updated[0] = spine[0];
+
+    let new_root = compute_native_root(leaf_r_updated, &path_r_updated, &index_bits_r);
+
+    let circuit = MerkleTransferKernelCircuit {
+        leaf_s: Some(Fr::from(sender_balance)),
+        leaf_r: Some(leaf_r),
+        path_s: Some(path_s),
+        path_r: Some(path_r_initial),
+        index_bits_s: Some(index_bits_s),
+        index_bits_r: Some(index_bits_r),
+        amount: Some(amount_fr),
+        old_root: Some(old_root),
+        new_root: Some(new_root),
+    };
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    circuit.generate_constraints(cs.clone()).unwrap();
+
+    assert!(
+        !cs.is_satisfied().unwrap(),
+        "Receiver overflow by 1 should be rejected"
+    );
+
+    println!("✓ Receiver overflow by 1 (MAX + 1) correctly rejected");
+}
+
+// ============================================================================
+// AMOUNT RANGE TESTS - Properly constructed
+// ============================================================================
+
+#[test]
+fn test_huge_amount_rejected() {
+    // Amount is 2^64, larger than any valid 64-bit value
+
+    let sender_balance = u64::MAX;
+    let receiver_balance = 0u64;
+
+    let (_, _, path_s, path_r_initial, old_root) =
+        create_two_leaf_tree(sender_balance, receiver_balance);
+
+    let leaf_s = Fr::from(sender_balance);
+    let leaf_r = Fr::from(receiver_balance);
+
+    let index_bits_s = [Fr::ZERO; 8];
+    let mut index_bits_r = [Fr::ZERO; 8];
+    index_bits_r[0] = Fr::ONE;
+
+    // Amount = 2^64 (just over the limit)
+    let huge_amount = Fr::from(u64::MAX) + Fr::ONE;
+
+    // Compute what the circuit would compute
+    let leaf_s_updated = leaf_s - huge_amount; // Wraps negative in Fr
+    let leaf_r_updated = leaf_r + huge_amount; // = 2^64
+
+    let spine = compute_spine(leaf_s_updated, &path_s, &index_bits_s);
+
+    let mut path_r_updated = path_r_initial;
+    path_r_updated[0] = spine[0];
+
+    let new_root = compute_native_root(leaf_r_updated, &path_r_updated, &index_bits_r);
+
+    let circuit = MerkleTransferKernelCircuit {
+        leaf_s: Some(leaf_s),
+        leaf_r: Some(leaf_r),
+        path_s: Some(path_s),
+        path_r: Some(path_r_initial),
+        index_bits_s: Some(index_bits_s),
+        index_bits_r: Some(index_bits_r),
+        amount: Some(huge_amount),
+        old_root: Some(old_root),
+        new_root: Some(new_root),
+    };
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    circuit.generate_constraints(cs.clone()).unwrap();
+
+    assert!(
+        !cs.is_satisfied().unwrap(),
+        "Huge amount (2^64) should be rejected"
+    );
+
+    println!("✓ Huge amount (2^64) correctly rejected");
+}
+
+#[test]
+fn test_negative_amount_rejected() {
+    // Amount is "negative" (p - 10), a huge field element
+    // This would effectively transfer FROM receiver TO sender
+
+    let sender_balance = 100u64;
+    let receiver_balance = 50u64;
+
+    let (_, _, path_s, path_r_initial, old_root) =
+        create_two_leaf_tree(sender_balance, receiver_balance);
+
+    let leaf_s = Fr::from(sender_balance);
+    let leaf_r = Fr::from(receiver_balance);
+
+    let index_bits_s = [Fr::ZERO; 8];
+    let mut index_bits_r = [Fr::ZERO; 8];
+    index_bits_r[0] = Fr::ONE;
+
+    // "Negative" amount: -10 in field = p - 10
+    let negative_amount = Fr::ZERO - Fr::from(10u64);
+
+    // sender_new = 100 - (-10) = 110 (valid)
+    // receiver_new = 50 + (-10) = 40 (valid)
+    // But amount itself is huge (p - 10), fails range check
+    let leaf_s_updated = leaf_s - negative_amount; // 100 + 10 = 110
+    let leaf_r_updated = leaf_r + negative_amount; // 50 - 10 = 40
+
+    let spine = compute_spine(leaf_s_updated, &path_s, &index_bits_s);
+
+    let mut path_r_updated = path_r_initial;
+    path_r_updated[0] = spine[0];
+
+    let new_root = compute_native_root(leaf_r_updated, &path_r_updated, &index_bits_r);
+
+    let circuit = MerkleTransferKernelCircuit {
+        leaf_s: Some(leaf_s),
+        leaf_r: Some(leaf_r),
+        path_s: Some(path_s),
+        path_r: Some(path_r_initial),
+        index_bits_s: Some(index_bits_s),
+        index_bits_r: Some(index_bits_r),
+        amount: Some(negative_amount),
+        old_root: Some(old_root),
+        new_root: Some(new_root),
+    };
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    circuit.generate_constraints(cs.clone()).unwrap();
+
+    assert!(
+        !cs.is_satisfied().unwrap(),
+        "Negative amount should be rejected by range check"
+    );
+
+    println!("✓ Negative amount (p - 10) correctly rejected");
+}
+
+#[test]
+fn test_amount_just_over_64_bits_rejected() {
+    // Amount is 2^64 + 1
+
+    let sender_balance = u64::MAX;
+    let receiver_balance = 0u64;
+
+    let (_, _, path_s, path_r_initial, old_root) =
+        create_two_leaf_tree(sender_balance, receiver_balance);
+
+    let leaf_s = Fr::from(sender_balance);
+    let leaf_r = Fr::from(receiver_balance);
+
+    let index_bits_s = [Fr::ZERO; 8];
+    let mut index_bits_r = [Fr::ZERO; 8];
+    index_bits_r[0] = Fr::ONE;
+
+    // 2^64 + 1
+    let bad_amount = Fr::from(u64::MAX) + Fr::from(2u64);
+
+    let leaf_s_updated = leaf_s - bad_amount;
+    let leaf_r_updated = leaf_r + bad_amount;
+
+    let spine = compute_spine(leaf_s_updated, &path_s, &index_bits_s);
+
+    let mut path_r_updated = path_r_initial;
+    path_r_updated[0] = spine[0];
+
+    let new_root = compute_native_root(leaf_r_updated, &path_r_updated, &index_bits_r);
+
+    let circuit = MerkleTransferKernelCircuit {
+        leaf_s: Some(leaf_s),
+        leaf_r: Some(leaf_r),
+        path_s: Some(path_s),
+        path_r: Some(path_r_initial),
+        index_bits_s: Some(index_bits_s),
+        index_bits_r: Some(index_bits_r),
+        amount: Some(bad_amount),
+        old_root: Some(old_root),
+        new_root: Some(new_root),
+    };
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    circuit.generate_constraints(cs.clone()).unwrap();
+
+    assert!(
+        !cs.is_satisfied().unwrap(),
+        "Amount 2^64 + 1 should be rejected"
+    );
+
+    println!("✓ Amount just over 64 bits (2^64 + 1) correctly rejected");
+}
+
+// ============================================================================
+// POSITIVE TESTS - These should still pass
+// ============================================================================
+
+#[test]
+fn test_receiver_at_max_after_transfer_works() {
+    // Receiver ends up at exactly u64::MAX - should work
+
+    let sender_balance = 200u64;
+    let receiver_balance = u64::MAX - 100;
+    let amount = 100u64; // receiver ends at MAX
+
+    let scenario = create_transfer_scenario(sender_balance, receiver_balance, amount);
+
+    let circuit = MerkleTransferKernelCircuit {
+        leaf_s: Some(scenario.leaf_s),
+        leaf_r: Some(scenario.leaf_r),
+        path_s: Some(scenario.path_s),
+        path_r: Some(scenario.path_r),
+        index_bits_s: Some(scenario.index_bits_s),
+        index_bits_r: Some(scenario.index_bits_r),
+        amount: Some(scenario.amount),
+        old_root: Some(scenario.old_root),
+        new_root: Some(scenario.new_root),
+    };
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    circuit.generate_constraints(cs.clone()).unwrap();
+
+    assert!(
+        cs.is_satisfied().unwrap(),
+        "Receiver at exactly MAX should work"
+    );
+
+    println!("✓ Receiver ending at u64::MAX works");
+}
+
+#[test]
+fn test_max_valid_amount_works() {
+    // Amount is exactly u64::MAX - should work if balances support it
+
+    let sender_balance = u64::MAX;
+    let receiver_balance = 0u64;
+    let amount = u64::MAX;
+
+    let scenario = create_transfer_scenario(sender_balance, receiver_balance, amount);
+
+    let circuit = MerkleTransferKernelCircuit {
+        leaf_s: Some(scenario.leaf_s),
+        leaf_r: Some(scenario.leaf_r),
+        path_s: Some(scenario.path_s),
+        path_r: Some(scenario.path_r),
+        index_bits_s: Some(scenario.index_bits_s),
+        index_bits_r: Some(scenario.index_bits_r),
+        amount: Some(scenario.amount),
+        old_root: Some(scenario.old_root),
+        new_root: Some(scenario.new_root),
+    };
+
+    let cs = ConstraintSystem::<Fr>::new_ref();
+    circuit.generate_constraints(cs.clone()).unwrap();
+
+    assert!(
+        cs.is_satisfied().unwrap(),
+        "Max valid amount (u64::MAX) should work"
+    );
+
+    println!("✓ Max valid amount (u64::MAX) works");
 }
