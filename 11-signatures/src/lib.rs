@@ -1,3 +1,3 @@
 mod circuit;
-mod curve;
+pub mod curve;
 mod eddsa;

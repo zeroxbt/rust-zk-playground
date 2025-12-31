@@ -1,3 +1,3 @@
 mod gadget;
-mod native;
-mod spec;
+pub mod native;
+pub mod spec;
