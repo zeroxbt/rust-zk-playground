@@ -1,5 +1,5 @@
 use ark_bls12_381::Fr;
-use ark_ff::AdditiveGroup;
+use ark_ff::{AdditiveGroup, Field};
 use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError, Variable};
 
 #[derive(Clone, Copy, Debug)]
@@ -51,6 +51,13 @@ impl State {
         Self {
             val: Fr::ZERO,
             var: Variable::Zero,
+        }
+    }
+
+    pub fn one() -> Self {
+        Self {
+            val: Fr::ONE,
+            var: Variable::One,
         }
     }
 
