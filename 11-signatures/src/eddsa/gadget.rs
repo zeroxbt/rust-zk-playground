@@ -51,7 +51,7 @@ pub fn verify(
     pk: &PointVar,
     msg: State,
     s: &[State; 256],
-    r: PointVar,
+    r: &PointVar,
 ) -> Result<(), SynthesisError> {
     let sponge = SpongeGadget::<PoseidonPermutation, 3, 2>::default();
 
@@ -125,7 +125,7 @@ mod tests {
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
         // Verify in circuit
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(cs.is_satisfied().unwrap(), "Valid signature should verify");
         println!("✓ Valid signature verified");
@@ -146,7 +146,7 @@ mod tests {
             let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
             let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-            verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+            verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
             assert!(cs.is_satisfied().unwrap(), "Signature {} should verify", i);
         }
@@ -170,7 +170,7 @@ mod tests {
             let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
             let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-            verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+            verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
             assert!(cs.is_satisfied().unwrap(), "Key {} should verify", i);
         }
@@ -195,7 +195,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(!cs.is_satisfied().unwrap(), "Wrong message should fail");
         println!("✓ Wrong message rejected");
@@ -220,7 +220,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(!cs.is_satisfied().unwrap(), "Wrong public key should fail");
         println!("✓ Wrong public key rejected");
@@ -242,7 +242,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &wrong_r).unwrap(); // Wrong R
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(!cs.is_satisfied().unwrap(), "Tampered R should fail");
         println!("✓ Tampered R rejected");
@@ -265,7 +265,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
         let s_bits = witness_bits_fixed(&cs, &wrong_s); // Wrong s
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(!cs.is_satisfied().unwrap(), "Tampered s should fail");
         println!("✓ Tampered s rejected");
@@ -284,7 +284,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r.negate()).unwrap(); // Negated R
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(!cs.is_satisfied().unwrap(), "Negated R should fail");
         println!("✓ Negated R rejected");
@@ -306,7 +306,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
         let s_bits = witness_bits_fixed(&cs, &zero_s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(!cs.is_satisfied().unwrap(), "Zero s should fail");
         println!("✓ Zero s rejected");
@@ -329,7 +329,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(cs.is_satisfied().unwrap(), "Zero message should verify");
         println!("✓ Zero message verified");
@@ -348,7 +348,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(cs.is_satisfied().unwrap(), "One message should verify");
         println!("✓ One message verified");
@@ -372,7 +372,7 @@ mod tests {
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
         let before = cs.num_constraints();
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
         let after = cs.num_constraints();
 
         let verify_constraints = after - before;
@@ -411,7 +411,7 @@ mod tests {
         let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
         let s_bits = witness_bits_fixed(&cs, &sig.s);
 
-        verify(&cs, &pk_var, msg_var, &s_bits, r_var).unwrap();
+        verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
         assert!(
             cs.is_satisfied().unwrap(),

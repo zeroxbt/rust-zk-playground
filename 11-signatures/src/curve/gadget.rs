@@ -36,6 +36,15 @@ impl PointVar {
         Ok(Self { x, y })
     }
 
+    pub fn from_point_input(
+        cs: &ConstraintSystemRef<Fr>,
+        p: &Point,
+    ) -> Result<Self, SynthesisError> {
+        let x = State::input(cs, p.x())?;
+        let y = State::input(cs, p.y())?;
+        Ok(Self { x, y })
+    }
+
     pub fn generator(cs: &ConstraintSystemRef<Fr>) -> Result<Self, SynthesisError> {
         Self::from_point(cs, &Point::generator())
     }
