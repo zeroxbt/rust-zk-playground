@@ -60,4 +60,8 @@ impl LeafState {
     pub fn salt(&self) -> State {
         self.salt
     }
+
+    pub fn set_balance(&mut self, balance: State) {
+        self.balance = balance;
+    }
 }

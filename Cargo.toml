@@ -11,5 +11,6 @@ members = [
     "09-nullifiers",
     "10-non-membership",
     "11-signatures",
+    "12-batch-transfers",
 ]
 resolver = "2"
