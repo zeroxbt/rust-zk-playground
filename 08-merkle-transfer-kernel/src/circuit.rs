@@ -123,12 +123,12 @@ pub fn enforce_old_root<const T: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gadget::{enforce_one_hot, first_difference_selectors};
     use ark_bls12_381::Fr;
     use ark_ff::Field;
     use ark_relations::r1cs::ConstraintSystem;
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
     use merkle_membership::merkle::spec::MERKLE_NODE_DST;
-    use crate::gadget::{enforce_one_hot, first_difference_selectors};
 
     // ========================================================================
     // TEST DATA GENERATION HELPERS
@@ -1233,30 +1233,31 @@ mod tests {
     }
 
     // Helper: build a sparse tree with two populated leaves at arbitrary indices.
-    // Returns (leaf_s, leaf_r, path_s, path_r, index_bits_s, index_bits_r, root)
+    type SparseTwoLeafTree = (
+        Fr,
+        Fr, // leaf_s, leaf_r
+        [Fr; DEPTH],
+        [Fr; DEPTH], // path_s, path_r
+        [Fr; DEPTH],
+        [Fr; DEPTH], // index_bits_s, index_bits_r
+        Fr,          // root
+    );
+
     fn build_sparse_two_leaf_tree(
         sender_idx: usize,
         sender_balance: u64,
         receiver_idx: usize,
         receiver_balance: u64,
-    ) -> (
-        Fr,
-        Fr,
-        [Fr; DEPTH],
-        [Fr; DEPTH],
-        [Fr; DEPTH],
-        [Fr; DEPTH],
-        Fr,
-    ) {
+    ) -> SparseTwoLeafTree {
         let mut leaves = vec![Fr::ZERO; 1 << DEPTH];
         leaves[sender_idx] = Fr::from(sender_balance);
         leaves[receiver_idx] = Fr::from(receiver_balance);
 
         let index_bits = |idx: usize| -> [Fr; DEPTH] {
             let mut bits = [Fr::ZERO; DEPTH];
-            for i in 0..DEPTH {
+            for (i, b) in bits.iter_mut().enumerate().take(DEPTH) {
                 if (idx >> i) & 1 == 1 {
-                    bits[i] = Fr::ONE;
+                    *b = Fr::ONE;
                 }
             }
             bits
