@@ -207,7 +207,7 @@ fn wrong_witness_corrupted_path() {
     let absent = Fr::from(999u64);
     let proof = tree.prove(absent);
 
-    let mut bad_path = proof.path();
+    let mut bad_path = *proof.path();
     bad_path[0] = Fr::from(123456u64);
 
     let circuit = NonMembershipCircuit {
@@ -239,7 +239,7 @@ fn wrong_witness_wrong_nullifier() {
     let circuit = NonMembershipCircuit {
         root: Some(tree.root()),
         nullifier: Some(nullifier2),
-        path: Some(proof.path()),
+        path: Some(*proof.path()),
     };
 
     let cs = ConstraintSystem::<Fr>::new_ref();
@@ -266,7 +266,7 @@ fn wrong_witness_proof_from_different_tree() {
     let circuit = NonMembershipCircuit {
         root: Some(tree2.root()),
         nullifier: Some(nullifier),
-        path: Some(proof_from_tree1.path()),
+        path: Some(*proof_from_tree1.path()),
     };
 
     let cs = ConstraintSystem::<Fr>::new_ref();

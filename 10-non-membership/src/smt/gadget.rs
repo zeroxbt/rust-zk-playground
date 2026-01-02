@@ -7,15 +7,14 @@ use hash_preimage::{
 };
 use merkle_membership::merkle::gadget::compute_root;
 
-use crate::smt::spec::{DEFAULT_LEAF, index_bits};
+use crate::smt::spec::{DEFAULT_LEAF, SmtNonMembershipProofVar, index_bits};
 
 pub fn verify_non_membership<const D: usize>(
     cs: &ConstraintSystemRef<Fr>,
     root: State,
-    nullifier: State,
-    path: &[State; D],
+    proof: &SmtNonMembershipProofVar<D>,
 ) -> Result<(), SynthesisError> {
-    let index_bits = nullifier_to_index_bits(cs, nullifier)?;
+    let index_bits = nullifier_to_index_bits(cs, proof.nullifier())?;
     let default_leaf = State::witness(cs, DEFAULT_LEAF)?;
     cs.enforce_constraint(
         LinearCombination::from(default_leaf.var()),
@@ -27,7 +26,7 @@ pub fn verify_non_membership<const D: usize>(
         cs,
         &SpongeGadget::<PoseidonPermutation, 3, 2>::default(),
         default_leaf,
-        path,
+        proof.path(),
         &index_bits,
     )?;
 

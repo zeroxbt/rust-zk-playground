@@ -3,7 +3,7 @@ use ark_ff::UniformRand;
 use rand::thread_rng;
 
 use non_membership::smt::{
-    native::verify_non_membership, spec::NonMembershipProof, tree::SparseMerkleTree,
+    native::verify_non_membership, spec::SmtNonMembershipProof, tree::SparseMerkleTree,
 };
 
 const TEST_DEPTH: usize = 16;
@@ -65,9 +65,9 @@ fn non_membership_fails_with_corrupted_first_sibling() {
     let proof = tree.prove(nullifier);
     let root = tree.root();
 
-    let mut bad_siblings = proof.path();
+    let mut bad_siblings = *proof.path();
     bad_siblings[0] = Fr::from(123456u64);
-    let bad_proof = NonMembershipProof::new(bad_siblings, nullifier);
+    let bad_proof = SmtNonMembershipProof::new(bad_siblings, nullifier);
 
     assert!(
         !verify_non_membership(root, nullifier, &bad_proof),
@@ -83,9 +83,9 @@ fn non_membership_fails_with_corrupted_middle_sibling() {
     let proof = tree.prove(nullifier);
     let root = tree.root();
 
-    let mut bad_siblings = proof.path();
+    let mut bad_siblings = *proof.path();
     bad_siblings[TEST_DEPTH / 2] = Fr::from(123456u64);
-    let bad_proof = NonMembershipProof::new(bad_siblings, nullifier);
+    let bad_proof = SmtNonMembershipProof::new(bad_siblings, nullifier);
 
     assert!(
         !verify_non_membership(root, nullifier, &bad_proof),
@@ -101,9 +101,9 @@ fn non_membership_fails_with_corrupted_last_sibling() {
     let proof = tree.prove(nullifier);
     let root = tree.root();
 
-    let mut bad_siblings = proof.path();
+    let mut bad_siblings = *proof.path();
     bad_siblings[TEST_DEPTH - 1] = Fr::from(123456u64);
-    let bad_proof = NonMembershipProof::new(bad_siblings, nullifier);
+    let bad_proof = SmtNonMembershipProof::new(bad_siblings, nullifier);
 
     assert!(
         !verify_non_membership(root, nullifier, &bad_proof),
@@ -140,9 +140,9 @@ fn non_membership_fails_with_swapped_siblings() {
     let proof = tree.prove(absent);
     let root = tree.root();
 
-    let mut bad_siblings = proof.path();
+    let mut bad_siblings = *proof.path();
     bad_siblings.swap(0, 1);
-    let bad_proof = NonMembershipProof::new(bad_siblings, absent);
+    let bad_proof = SmtNonMembershipProof::new(bad_siblings, absent);
 
     assert!(
         !verify_non_membership(root, absent, &bad_proof),
@@ -159,9 +159,9 @@ fn non_membership_fails_with_reversed_siblings() {
     let proof = tree.prove(absent);
     let root = tree.root();
 
-    let mut bad_siblings = proof.path();
+    let mut bad_siblings = *proof.path();
     bad_siblings.reverse();
-    let bad_proof = NonMembershipProof::new(bad_siblings, absent);
+    let bad_proof = SmtNonMembershipProof::new(bad_siblings, absent);
 
     assert!(
         !verify_non_membership(root, absent, &bad_proof),
@@ -178,7 +178,7 @@ fn non_membership_fails_with_all_zero_siblings() {
     let root = tree.root();
 
     let bad_siblings = [Fr::from(0u64); TEST_DEPTH];
-    let bad_proof = NonMembershipProof::new(bad_siblings, absent);
+    let bad_proof = SmtNonMembershipProof::new(bad_siblings, absent);
 
     assert!(
         !verify_non_membership(root, absent, &bad_proof),
@@ -217,7 +217,7 @@ fn non_membership_fails_random_siblings() {
     let nullifier = Fr::from(999u64);
 
     let random_siblings: [Fr; TEST_DEPTH] = std::array::from_fn(|_| Fr::rand(&mut rng));
-    let bad_proof = NonMembershipProof::new(random_siblings, nullifier);
+    let bad_proof = SmtNonMembershipProof::new(random_siblings, nullifier);
 
     assert!(
         !verify_non_membership(root, nullifier, &bad_proof),

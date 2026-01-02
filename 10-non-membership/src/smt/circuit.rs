@@ -3,7 +3,9 @@ use ark_ff::AdditiveGroup;
 use ark_relations::r1cs::ConstraintSynthesizer;
 use hash_preimage::sponge::gadget::State;
 
-use crate::smt::{gadget::verify_non_membership, tree::SparseMerkleTree};
+use crate::smt::{
+    gadget::verify_non_membership, spec::SmtNonMembershipProofVar, tree::SparseMerkleTree,
+};
 pub struct NonMembershipCircuit<const D: usize> {
     // Public inputs
     pub root: Option<Fr>,
@@ -18,7 +20,7 @@ impl<const D: usize> NonMembershipCircuit<D> {
         Self {
             root: Some(tree.root()),
             nullifier: Some(nullifier),
-            path: Some(proof.path()),
+            path: Some(*proof.path()),
         }
     }
 }
@@ -32,7 +34,7 @@ impl<const D: usize> ConstraintSynthesizer<Fr> for NonMembershipCircuit<D> {
         let nullifier = State::witness(&cs, self.nullifier.unwrap_or_default())?;
         let path: [State; D] = State::witness_array(&cs, &self.path.unwrap_or([Fr::ZERO; D]))?;
 
-        verify_non_membership(&cs, root, nullifier, &path)?;
+        verify_non_membership(&cs, root, &SmtNonMembershipProofVar::new(path, nullifier))?;
         Ok(())
     }
 }

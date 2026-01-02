@@ -4,7 +4,7 @@ use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::Spong
 use merkle_membership::merkle::spec::MERKLE_NODE_DST;
 
 use crate::smt::{
-    spec::{NULLIFIER_MARKER, NonMembershipProof, index_bits},
+    spec::{NULLIFIER_MARKER, SmtNonMembershipProof, index_bits},
     storage::Storage,
 };
 
@@ -59,8 +59,8 @@ impl<const D: usize> SparseMerkleTree<'_, D> {
         self.storage.get(D, [false; D])
     }
 
-    pub fn prove(&self, nullifier: Fr) -> NonMembershipProof<D> {
-        NonMembershipProof::new(self.siblings(nullifier), nullifier)
+    pub fn prove(&self, nullifier: Fr) -> SmtNonMembershipProof<D> {
+        SmtNonMembershipProof::new(self.siblings(nullifier), nullifier)
     }
 
     fn siblings(&self, leaf: Fr) -> [Fr; D] {

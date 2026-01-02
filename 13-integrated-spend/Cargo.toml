@@ -13,6 +13,7 @@ merkle-membership = { path = "../05-merkle-membership" }
 nullifiers = { path = "../09-nullifiers" }
 signatures = { path = "../11-signatures" }
 non-membership = { path = "../10-non-membership" }
+batch-transfers = { path = "../12-batch-transfers" }
 
 [dev-dependencies]
 rand = "0.8"
