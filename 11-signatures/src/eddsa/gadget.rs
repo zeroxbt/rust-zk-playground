@@ -6,7 +6,10 @@ use hash_preimage::{
     sponge::gadget::{SpongeGadget, State},
 };
 
-use crate::curve::gadget::{PointVar, add, scalar_mul};
+use crate::{
+    curve::gadget::{PointVar, add, scalar_mul},
+    eddsa::spec::SIG_HASH_DST,
+};
 
 fn to_bits_le_fixed(
     cs: &ConstraintSystemRef<Fr>,
@@ -55,7 +58,12 @@ pub fn verify(
 ) -> Result<(), SynthesisError> {
     let sponge = SpongeGadget::<PoseidonPermutation, 3, 2>::default();
 
-    let h_fr = sponge.hash(cs, &[r.x(), r.y(), pk.x(), pk.y(), msg], 1)?;
+    let h_fr = sponge.hash_with_dst(
+        cs,
+        &[r.x(), r.y(), pk.x(), pk.y(), msg],
+        Some(SIG_HASH_DST),
+        1,
+    )?;
 
     let lhs = scalar_mul(cs, s, &PointVar::generator(cs)?)?;
     let mut scalar_bits = to_bits_le_fixed(cs, h_fr)?;

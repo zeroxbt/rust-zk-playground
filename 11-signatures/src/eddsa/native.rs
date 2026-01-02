@@ -7,7 +7,7 @@ use crate::{
         scalar::Scalar,
         spec::Point,
     },
-    eddsa::spec::Signature,
+    eddsa::spec::{SIG_HASH_DST, Signature},
 };
 
 pub fn sign(sk_fr: Fr, msg: Fr) -> Signature {
@@ -18,14 +18,17 @@ pub fn sign(sk_fr: Fr, msg: Fr) -> Signature {
     let sk = Scalar::from_fr_reduced(sk_fr);
 
     // r = H(sk_fr, msg) mod r
-    let r_fr = sponge.hash(&[sk_fr, msg]);
+    let r_fr = sponge.hash_with_dst(&[sk_fr, msg], Some(SIG_HASH_DST));
     let r = Scalar::from_fr_reduced(r_fr);
 
     let r_point = scalar_mul(&r.to_bits_be::<256>(), &g);
     let pk = scalar_mul(&sk.to_bits_be::<256>(), &g);
 
     // h = H(R, A, msg) mod r
-    let h_fr = sponge.hash(&[r_point.x(), r_point.y(), pk.x(), pk.y(), msg]);
+    let h_fr = sponge.hash_with_dst(
+        &[r_point.x(), r_point.y(), pk.x(), pk.y(), msg],
+        Some(SIG_HASH_DST),
+    );
     let h = Scalar::from_fr_reduced(h_fr);
 
     // s = r + h*sk mod r
@@ -40,7 +43,10 @@ pub fn sign(sk_fr: Fr, msg: Fr) -> Signature {
 pub fn verify(pk: &Point, msg: Fr, sig: &Signature) -> bool {
     let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
 
-    let h_fr = sponge.hash(&[sig.r.x(), sig.r.y(), pk.x(), pk.y(), msg]);
+    let h_fr = sponge.hash_with_dst(
+        &[sig.r.x(), sig.r.y(), pk.x(), pk.y(), msg],
+        Some(SIG_HASH_DST),
+    );
     let h = Scalar::from_fr_reduced(h_fr);
 
     let lhs = scalar_mul(&sig.s, &Point::generator());
