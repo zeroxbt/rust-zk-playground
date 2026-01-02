@@ -11,13 +11,14 @@ use crate::nullifier::spec::NULLIFIER_DST;
 pub fn derive_nullifier<const T: usize>(
     cs: &ConstraintSystemRef<Fr>,
     secret: State,
+    nonce: State,
     index_bits: &[State; T],
 ) -> Result<State, SynthesisError> {
     let sponge = SpongeGadget::<PoseidonPermutation, 3, 2>::default();
 
     sponge.hash_with_dst(
         cs,
-        &[secret, bits_to_field(cs, index_bits)?],
+        &[secret, bits_to_field(cs, index_bits)?, nonce],
         Some(NULLIFIER_DST),
         1,
     )

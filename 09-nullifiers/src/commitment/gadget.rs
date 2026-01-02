@@ -15,7 +15,7 @@ pub fn create_commitment(
 
     sponge.hash_with_dst(
         cs,
-        &[leaf.secret(), leaf.balance(), leaf.salt()],
+        &[leaf.secret(), leaf.balance(), leaf.salt(), leaf.nonce()],
         Some(COMMITMENT_DST),
         1,
     )

@@ -38,11 +38,12 @@ fn determinism() {
 
     for _ in 0..50 {
         let secret = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
         let index_bits = random_index_bits::<DEPTH>(&mut rng);
 
         assert_eq!(
-            native::derive_nullifier(secret, &index_bits),
-            native::derive_nullifier(secret, &index_bits)
+            native::derive_nullifier(secret, nonce, &index_bits),
+            native::derive_nullifier(secret, nonce, &index_bits)
         );
     }
 }
@@ -54,11 +55,12 @@ fn sensitivity_to_secret() {
     for _ in 0..50 {
         let secret1 = Fr::rand(&mut rng);
         let secret2 = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
         let index_bits = random_index_bits::<DEPTH>(&mut rng);
 
         assert_ne!(
-            native::derive_nullifier(secret1, &index_bits),
-            native::derive_nullifier(secret2, &index_bits)
+            native::derive_nullifier(secret1, nonce, &index_bits),
+            native::derive_nullifier(secret2, nonce, &index_bits)
         );
     }
 }
@@ -69,6 +71,7 @@ fn sensitivity_to_index() {
 
     for _ in 0..50 {
         let secret = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
         let index_bits1 = random_index_bits::<DEPTH>(&mut rng);
         let mut index_bits2 = index_bits1;
 
@@ -76,8 +79,8 @@ fn sensitivity_to_index() {
         index_bits2[flip_pos] = !index_bits2[flip_pos];
 
         assert_ne!(
-            native::derive_nullifier(secret, &index_bits1),
-            native::derive_nullifier(secret, &index_bits2)
+            native::derive_nullifier(secret, nonce, &index_bits1),
+            native::derive_nullifier(secret, nonce, &index_bits2)
         );
     }
 }
@@ -88,6 +91,7 @@ fn same_secret_different_index_produces_different_nullifiers() {
 
     for _ in 0..50 {
         let secret = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
         let index_bits1 = random_index_bits::<DEPTH>(&mut rng);
         let index_bits2 = random_index_bits::<DEPTH>(&mut rng);
 
@@ -96,8 +100,8 @@ fn same_secret_different_index_produces_different_nullifiers() {
         }
 
         assert_ne!(
-            native::derive_nullifier(secret, &index_bits1),
-            native::derive_nullifier(secret, &index_bits2)
+            native::derive_nullifier(secret, nonce, &index_bits1),
+            native::derive_nullifier(secret, nonce, &index_bits2)
         );
     }
 }
@@ -109,6 +113,7 @@ fn different_secret_same_index_produces_different_nullifiers() {
     for _ in 0..50 {
         let secret1 = Fr::rand(&mut rng);
         let secret2 = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
         let index_bits = random_index_bits::<DEPTH>(&mut rng);
 
         if secret1 == secret2 {
@@ -116,8 +121,8 @@ fn different_secret_same_index_produces_different_nullifiers() {
         }
 
         assert_ne!(
-            native::derive_nullifier(secret1, &index_bits),
-            native::derive_nullifier(secret2, &index_bits)
+            native::derive_nullifier(secret1, nonce, &index_bits),
+            native::derive_nullifier(secret2, nonce, &index_bits)
         );
     }
 }
@@ -128,10 +133,11 @@ fn non_zero_output() {
 
     for _ in 0..50 {
         let secret = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
         let index_bits = random_index_bits::<DEPTH>(&mut rng);
 
         assert_ne!(
-            native::derive_nullifier(secret, &index_bits),
+            native::derive_nullifier(secret, nonce, &index_bits),
             Fr::from(0u64)
         );
     }
@@ -141,9 +147,10 @@ fn non_zero_output() {
 fn all_zero_index_works() {
     let mut rng = test_rng();
     let secret = Fr::rand(&mut rng);
+    let nonce = Fr::rand(&mut rng);
     let index_bits = [false; DEPTH];
 
-    let nullifier = native::derive_nullifier(secret, &index_bits);
+    let nullifier = native::derive_nullifier(secret, nonce, &index_bits);
     assert_ne!(nullifier, Fr::from(0u64));
 }
 
@@ -151,9 +158,10 @@ fn all_zero_index_works() {
 fn all_one_index_works() {
     let mut rng = test_rng();
     let secret = Fr::rand(&mut rng);
+    let nonce = Fr::rand(&mut rng);
     let index_bits = [true; DEPTH];
 
-    let nullifier = native::derive_nullifier(secret, &index_bits);
+    let nullifier = native::derive_nullifier(secret, nonce, &index_bits);
     assert_ne!(nullifier, Fr::from(0u64));
 }
 
@@ -195,12 +203,14 @@ fn derive_nullifier_consistency_with_native() {
 
     for _ in 0..10 {
         let secret = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
         let bits = random_index_bits::<DEPTH>(&mut rng);
 
-        let native_result = native::derive_nullifier(secret, &bits);
+        let native_result = native::derive_nullifier(secret, nonce, &bits);
 
         let cs = ConstraintSystem::<Fr>::new_ref();
         let secret_state = State::witness(&cs, secret).unwrap();
+        let nonce_state = State::witness(&cs, nonce).unwrap();
         let bit_states: [State; DEPTH] = std::array::from_fn(|i| {
             State::witness(
                 &cs,
@@ -213,7 +223,8 @@ fn derive_nullifier_consistency_with_native() {
             .unwrap()
         });
 
-        let gadget_result = gadget::derive_nullifier(&cs, secret_state, &bit_states).unwrap();
+        let gadget_result =
+            gadget::derive_nullifier(&cs, secret_state, nonce_state, &bit_states).unwrap();
 
         assert_eq!(gadget_result.val(), native_result);
         assert!(cs.is_satisfied().unwrap());
@@ -224,10 +235,12 @@ fn derive_nullifier_consistency_with_native() {
 fn derive_nullifier_constraints_satisfied() {
     let mut rng = test_rng();
     let secret = Fr::rand(&mut rng);
+    let nonce = Fr::rand(&mut rng);
     let bits = random_index_bits::<DEPTH>(&mut rng);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     let secret_state = State::witness(&cs, secret).unwrap();
+    let nonce_state = State::witness(&cs, nonce).unwrap();
     let bit_states: [State; DEPTH] = std::array::from_fn(|i| {
         State::witness(
             &cs,
@@ -240,10 +253,28 @@ fn derive_nullifier_constraints_satisfied() {
         .unwrap()
     });
 
-    let _nullifier = gadget::derive_nullifier(&cs, secret_state, &bit_states).unwrap();
+    let _nullifier = gadget::derive_nullifier(&cs, secret_state, nonce_state, &bit_states).unwrap();
 
     assert!(cs.is_satisfied().unwrap());
     println!("Nullifier circuit constraints: {}", cs.num_constraints());
+}
+
+#[test]
+fn nullifier_changes_with_nonce_and_index() {
+    let mut rng = test_rng();
+    let secret = Fr::rand(&mut rng);
+    let bits1 = random_index_bits::<DEPTH>(&mut rng);
+    let bits2 = random_index_bits::<DEPTH>(&mut rng);
+
+    let nonce1 = Fr::rand(&mut rng);
+    let nonce2 = Fr::rand(&mut rng);
+
+    let n11 = native::derive_nullifier(secret, nonce1, &bits1);
+    let n21 = native::derive_nullifier(secret, nonce2, &bits1);
+    assert_ne!(n11, n21, "Nullifier must change when nonce changes");
+
+    let n12 = native::derive_nullifier(secret, nonce1, &bits2);
+    assert_ne!(n11, n12, "Nullifier must change when index changes");
 }
 
 #[test]

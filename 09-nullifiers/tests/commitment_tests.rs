@@ -17,7 +17,8 @@ fn determinism() {
         let secret = Fr::rand(&mut rng);
         let balance = Fr::rand(&mut rng);
         let salt = Fr::rand(&mut rng);
-        let leaf = LeafData::new(secret, balance, salt);
+        let nonce = Fr::rand(&mut rng);
+        let leaf = LeafData::new(secret, balance, salt, nonce);
 
         assert_eq!(create_commitment(&leaf), create_commitment(&leaf.clone()));
     }
@@ -33,13 +34,15 @@ fn sensitivity() {
         let secret = Fr::rand(&mut rng);
         let balance = Fr::rand(&mut rng);
         let salt = Fr::rand(&mut rng);
+        let nonce = Fr::rand(&mut rng);
 
         let secret2 = secret + deltas[0];
         let balance2 = balance + deltas[1];
         let salt2 = salt + deltas[2];
+        let nonce2 = nonce + deltas[2]; // reuse one delta for nonce to ensure difference
 
-        let leaf = LeafData::new(secret, balance, salt);
-        let leaf2 = LeafData::new(secret2, balance2, salt2);
+        let leaf = LeafData::new(secret, balance, salt, nonce);
+        let leaf2 = LeafData::new(secret2, balance2, salt2, nonce2);
 
         assert_ne!(create_commitment(&leaf), create_commitment(&leaf2));
     }
@@ -53,7 +56,8 @@ fn non_zero_output() {
         let secret = Fr::rand(&mut rng);
         let balance = Fr::rand(&mut rng);
         let salt = Fr::rand(&mut rng);
-        let leaf = LeafData::new(secret, balance, salt);
+        let nonce = Fr::rand(&mut rng);
+        let leaf = LeafData::new(secret, balance, salt, nonce);
 
         assert_ne!(create_commitment(&leaf), Fr::ZERO);
     }
@@ -75,7 +79,8 @@ fn gadget_consistency_with_native() {
         let secret = Fr::rand(&mut rng);
         let balance = Fr::rand(&mut rng);
         let salt = Fr::rand(&mut rng);
-        let leaf = LeafData::new(secret, balance, salt);
+        let nonce = Fr::rand(&mut rng);
+        let leaf = LeafData::new(secret, balance, salt, nonce);
 
         let native_result = create_commitment_native(&leaf);
 
@@ -86,6 +91,7 @@ fn gadget_consistency_with_native() {
                 State::witness(&cs, leaf.secret()).unwrap(),
                 State::witness(&cs, leaf.balance()).unwrap(),
                 State::witness(&cs, leaf.salt()).unwrap(),
+                State::witness(&cs, leaf.nonce()).unwrap(),
             ),
         )
         .unwrap();
@@ -98,7 +104,12 @@ fn gadget_consistency_with_native() {
 #[test]
 fn gadget_constraints_satisfied() {
     let mut rng = test_rng();
-    let leaf = LeafData::new(Fr::rand(&mut rng), Fr::rand(&mut rng), Fr::rand(&mut rng));
+    let leaf = LeafData::new(
+        Fr::rand(&mut rng),
+        Fr::rand(&mut rng),
+        Fr::rand(&mut rng),
+        Fr::rand(&mut rng),
+    );
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     let _commitment = create_commitment_gadget(
@@ -107,6 +118,7 @@ fn gadget_constraints_satisfied() {
             State::witness(&cs, leaf.secret()).unwrap(),
             State::witness(&cs, leaf.balance()).unwrap(),
             State::witness(&cs, leaf.salt()).unwrap(),
+            State::witness(&cs, leaf.nonce()).unwrap(),
         ),
     )
     .unwrap();
@@ -118,7 +130,7 @@ fn gadget_constraints_satisfied() {
 #[test]
 fn gadget_zero_balance() {
     let mut rng = test_rng();
-    let leaf = LeafData::new(Fr::rand(&mut rng), Fr::ZERO, Fr::rand(&mut rng));
+    let leaf = LeafData::new(Fr::rand(&mut rng), Fr::ZERO, Fr::rand(&mut rng), Fr::rand(&mut rng));
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     let gadget_result = create_commitment_gadget(
@@ -127,6 +139,7 @@ fn gadget_zero_balance() {
             State::witness(&cs, leaf.secret()).unwrap(),
             State::witness(&cs, leaf.balance()).unwrap(),
             State::witness(&cs, leaf.salt()).unwrap(),
+            State::witness(&cs, leaf.nonce()).unwrap(),
         ),
     )
     .unwrap();
@@ -138,7 +151,7 @@ fn gadget_zero_balance() {
 
 #[test]
 fn gadget_all_zero_inputs() {
-    let leaf = LeafData::new(Fr::ZERO, Fr::ZERO, Fr::ZERO);
+    let leaf = LeafData::new(Fr::ZERO, Fr::ZERO, Fr::ZERO, Fr::ZERO);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     let gadget_result = create_commitment_gadget(
@@ -147,6 +160,7 @@ fn gadget_all_zero_inputs() {
             State::witness(&cs, leaf.secret()).unwrap(),
             State::witness(&cs, leaf.balance()).unwrap(),
             State::witness(&cs, leaf.salt()).unwrap(),
+            State::witness(&cs, leaf.nonce()).unwrap(),
         ),
     )
     .unwrap();

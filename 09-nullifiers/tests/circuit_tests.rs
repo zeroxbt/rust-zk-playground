@@ -32,6 +32,8 @@ struct TestData<const T: usize> {
     secret: Fr,
     balance: Fr,
     salt: Fr,
+    nonce: Fr,
+    leaf: LeafData,
     index_bits: [Fr; T],
     path: [Fr; T],
     root: Fr,
@@ -42,8 +44,9 @@ fn generate_test_data<const T: usize>(rng: &mut impl RngCore) -> TestData<T> {
     let secret = Fr::rand(rng);
     let balance = Fr::rand(rng);
     let salt = Fr::rand(rng);
+    let nonce = Fr::rand(rng);
 
-    let leaf_data = LeafData::new(secret, balance, salt);
+    let leaf_data = LeafData::new(secret, balance, salt, nonce);
     let leaf = create_commitment(&leaf_data);
 
     let index = (rng.next_u64() as usize) % (1 << T);
@@ -55,12 +58,14 @@ fn generate_test_data<const T: usize>(rng: &mut impl RngCore) -> TestData<T> {
     let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
     let root = compute_root_native(&sponge, leaf, &path, &index_bits_bool);
 
-    let nullifier = derive_nullifier(secret, &index_bits_bool);
+    let nullifier = derive_nullifier(secret, nonce, &index_bits_bool);
 
     TestData {
         secret,
         balance,
         salt,
+        nonce,
+        leaf: leaf_data,
         index_bits,
         path,
         root,
@@ -71,17 +76,15 @@ fn generate_test_data<const T: usize>(rng: &mut impl RngCore) -> TestData<T> {
 #[test]
 fn valid_spend_satisfies_constraints() {
     let TestData {
-        secret,
-        balance,
-        salt,
+        leaf,
         index_bits,
         path,
         root,
         nullifier,
+        ..
     } = generate_test_data::<DEPTH>(&mut test_rng());
 
-    let circuit =
-        NullifierCircuit::<DEPTH>::new(secret, balance, salt, index_bits, path, root, nullifier);
+    let circuit = NullifierCircuit::<DEPTH>::new(leaf, index_bits, path, root, nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -94,24 +97,16 @@ fn valid_spend_satisfies_constraints() {
 fn wrong_root_fails() {
     let mut rng = test_rng();
     let TestData {
-        secret,
-        balance,
-        salt,
+        leaf,
         index_bits,
         path,
         root: _,
         nullifier,
+        ..
     } = generate_test_data::<DEPTH>(&mut rng);
 
-    let circuit = NullifierCircuit::<DEPTH>::new(
-        secret,
-        balance,
-        salt,
-        index_bits,
-        path,
-        Fr::rand(&mut rng),
-        nullifier,
-    );
+    let circuit =
+        NullifierCircuit::<DEPTH>::new(leaf, index_bits, path, Fr::rand(&mut rng), nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -123,24 +118,15 @@ fn wrong_root_fails() {
 fn wrong_nullifier_fails() {
     let mut rng = test_rng();
     let TestData {
-        secret,
-        balance,
-        salt,
+        leaf,
         index_bits,
         path,
         root,
         nullifier: _,
+        ..
     } = generate_test_data::<DEPTH>(&mut rng);
 
-    let circuit = NullifierCircuit::<DEPTH>::new(
-        secret,
-        balance,
-        salt,
-        index_bits,
-        path,
-        root,
-        Fr::rand(&mut rng),
-    );
+    let circuit = NullifierCircuit::<DEPTH>::new(leaf, index_bits, path, root, Fr::rand(&mut rng));
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -152,24 +138,19 @@ fn wrong_nullifier_fails() {
 fn wrong_secret_fails() {
     let mut rng = test_rng();
     let TestData {
-        secret: _,
         balance,
         salt,
+        nonce,
         index_bits,
         path,
         root,
         nullifier,
+        ..
     } = generate_test_data::<DEPTH>(&mut rng);
 
-    let circuit = NullifierCircuit::<DEPTH>::new(
-        Fr::rand(&mut rng),
-        balance,
-        salt,
-        index_bits,
-        path,
-        root,
-        nullifier,
-    );
+    let wrong_leaf = LeafData::new(Fr::rand(&mut rng), balance, salt, nonce);
+
+    let circuit = NullifierCircuit::<DEPTH>::new(wrong_leaf, index_bits, path, root, nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -185,21 +166,18 @@ fn wrong_secret_fails() {
 fn wrong_path_fails() {
     let mut rng = test_rng();
     let TestData {
-        secret,
-        balance,
-        salt,
+        leaf,
         index_bits,
         path,
         root,
         nullifier,
+        ..
     } = generate_test_data::<DEPTH>(&mut rng);
 
     let mut bad_path = path;
     bad_path[0] = Fr::rand(&mut rng);
 
-    let circuit = NullifierCircuit::<DEPTH>::new(
-        secret, balance, salt, index_bits, bad_path, root, nullifier,
-    );
+    let circuit = NullifierCircuit::<DEPTH>::new(leaf, index_bits, bad_path, root, nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -210,27 +188,18 @@ fn wrong_path_fails() {
 #[test]
 fn non_binary_index_bit_fails() {
     let TestData {
-        secret,
-        balance,
-        salt,
+        leaf,
         index_bits,
         path,
         root,
         nullifier,
+        ..
     } = generate_test_data::<DEPTH>(&mut test_rng());
 
     let mut bad_index_bits = index_bits;
     bad_index_bits[0] = Fr::from(2u64); // not binary
 
-    let circuit = NullifierCircuit::<DEPTH>::new(
-        secret,
-        balance,
-        salt,
-        bad_index_bits,
-        path,
-        root,
-        nullifier,
-    );
+    let circuit = NullifierCircuit::<DEPTH>::new(leaf, bad_index_bits, path, root, nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -242,19 +211,18 @@ fn non_binary_index_bit_fails() {
 fn wrong_balance_fails() {
     let mut rng = test_rng();
     let TestData {
-        secret,
+        leaf,
         balance: _,
-        salt,
         index_bits,
         path,
         root,
         nullifier,
+        nonce,
+        ..
     } = generate_test_data::<DEPTH>(&mut rng);
 
     let circuit = NullifierCircuit::<DEPTH>::new(
-        secret,
-        Fr::rand(&mut rng),
-        salt,
+        LeafData::new(leaf.secret(), Fr::rand(&mut rng), leaf.salt(), nonce),
         index_bits,
         path,
         root,
@@ -271,19 +239,19 @@ fn wrong_balance_fails() {
 fn wrong_salt_fails() {
     let mut rng = test_rng();
     let TestData {
-        secret,
+        leaf,
         balance,
         salt: _,
         index_bits,
         path,
         root,
         nullifier,
+        nonce,
+        ..
     } = generate_test_data::<DEPTH>(&mut rng);
 
     let circuit = NullifierCircuit::<DEPTH>::new(
-        secret,
-        balance,
-        Fr::rand(&mut rng),
+        LeafData::new(leaf.secret(), balance, Fr::rand(&mut rng), nonce),
         index_bits,
         path,
         root,
@@ -311,9 +279,7 @@ fn wrong_index_bits_fails() {
     };
 
     let circuit = NullifierCircuit::<DEPTH>::new(
-        data.secret,
-        data.balance,
-        data.salt,
+        data.leaf,
         bad_index_bits,
         data.path,
         data.root,
@@ -334,7 +300,7 @@ fn same_leaf_produces_same_nullifier() {
     // Rebuild with same secret and index
     let index_bits_bool: [bool; DEPTH] =
         std::array::from_fn(|i| data1.index_bits[i] == Fr::from(1u64));
-    let nullifier_again = derive_nullifier(data1.secret, &index_bits_bool);
+    let nullifier_again = derive_nullifier(data1.secret, data1.nonce, &index_bits_bool);
 
     assert_eq!(data1.nullifier, nullifier_again);
 }
@@ -343,12 +309,13 @@ fn same_leaf_produces_same_nullifier() {
 fn different_index_produces_different_nullifier() {
     let mut rng = test_rng();
     let secret = Fr::rand(&mut rng);
+    let nonce = Fr::rand(&mut rng);
 
     let index1 = index_to_bits::<DEPTH>(0);
     let index2 = index_to_bits::<DEPTH>(1);
 
-    let nullifier1 = derive_nullifier(secret, &index1);
-    let nullifier2 = derive_nullifier(secret, &index2);
+    let nullifier1 = derive_nullifier(secret, nonce, &index1);
+    let nullifier2 = derive_nullifier(secret, nonce, &index2);
 
     assert_ne!(nullifier1, nullifier2);
 }
@@ -360,8 +327,9 @@ fn valid_spend_leftmost_leaf() {
     let secret = Fr::rand(&mut rng);
     let balance = Fr::rand(&mut rng);
     let salt = Fr::rand(&mut rng);
+    let nonce = Fr::rand(&mut rng);
 
-    let leaf_data = LeafData::new(secret, balance, salt);
+    let leaf_data = LeafData::new(secret, balance, salt, nonce);
     let leaf = create_commitment(&leaf_data);
 
     let index_bits_bool = [false; DEPTH]; // index 0
@@ -370,10 +338,9 @@ fn valid_spend_leftmost_leaf() {
 
     let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
     let root = compute_root_native(&sponge, leaf, &path, &index_bits_bool);
-    let nullifier = derive_nullifier(secret, &index_bits_bool);
+    let nullifier = derive_nullifier(secret, nonce, &index_bits_bool);
 
-    let circuit =
-        NullifierCircuit::<DEPTH>::new(secret, balance, salt, index_bits, path, root, nullifier);
+    let circuit = NullifierCircuit::<DEPTH>::new(leaf_data, index_bits, path, root, nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -388,8 +355,9 @@ fn valid_spend_rightmost_leaf() {
     let secret = Fr::rand(&mut rng);
     let balance = Fr::rand(&mut rng);
     let salt = Fr::rand(&mut rng);
+    let nonce = Fr::rand(&mut rng);
 
-    let leaf_data = LeafData::new(secret, balance, salt);
+    let leaf_data = LeafData::new(secret, balance, salt, nonce);
     let leaf = create_commitment(&leaf_data);
 
     let index_bits_bool = [true; DEPTH]; // max index
@@ -398,10 +366,9 @@ fn valid_spend_rightmost_leaf() {
 
     let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
     let root = compute_root_native(&sponge, leaf, &path, &index_bits_bool);
-    let nullifier = derive_nullifier(secret, &index_bits_bool);
+    let nullifier = derive_nullifier(secret, nonce, &index_bits_bool);
 
-    let circuit =
-        NullifierCircuit::<DEPTH>::new(secret, balance, salt, index_bits, path, root, nullifier);
+    let circuit = NullifierCircuit::<DEPTH>::new(leaf_data, index_bits, path, root, nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();
@@ -416,8 +383,9 @@ fn valid_spend_zero_balance() {
     let secret = Fr::rand(&mut rng);
     let balance = Fr::from(0u64);
     let salt = Fr::rand(&mut rng);
+    let nonce = Fr::rand(&mut rng);
 
-    let leaf_data = LeafData::new(secret, balance, salt);
+    let leaf_data = LeafData::new(secret, balance, salt, nonce);
     let leaf = create_commitment(&leaf_data);
 
     let index_bits_bool = index_to_bits::<DEPTH>(42);
@@ -426,10 +394,9 @@ fn valid_spend_zero_balance() {
 
     let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
     let root = compute_root_native(&sponge, leaf, &path, &index_bits_bool);
-    let nullifier = derive_nullifier(secret, &index_bits_bool);
+    let nullifier = derive_nullifier(secret, nonce, &index_bits_bool);
 
-    let circuit =
-        NullifierCircuit::<DEPTH>::new(secret, balance, salt, index_bits, path, root, nullifier);
+    let circuit = NullifierCircuit::<DEPTH>::new(leaf_data, index_bits, path, root, nullifier);
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     circuit.generate_constraints(cs.clone()).unwrap();

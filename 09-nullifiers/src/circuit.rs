@@ -5,7 +5,10 @@ use hash_preimage::sponge::gadget::{SpongeGadget, State};
 use merkle_membership::merkle::gadget::compute_root;
 
 use crate::{
-    commitment::{gadget::create_commitment, spec::LeafState},
+    commitment::{
+        gadget::create_commitment,
+        spec::{LeafData, LeafState},
+    },
     nullifier::gadget::derive_nullifier,
 };
 
@@ -14,6 +17,7 @@ pub struct NullifierCircuit<const T: usize> {
     secret: Option<Fr>,
     balance: Option<Fr>,
     salt: Option<Fr>,
+    nonce: Option<Fr>,
     index_bits: Option<[Fr; T]>,
     path: Option<[Fr; T]>,
     /* Public inputs */
@@ -23,18 +27,17 @@ pub struct NullifierCircuit<const T: usize> {
 
 impl<const T: usize> NullifierCircuit<T> {
     pub fn new(
-        secret: Fr,
-        balance: Fr,
-        salt: Fr,
+        leaf: LeafData,
         index_bits: [Fr; T],
         path: [Fr; T],
         root: Fr,
         nullifier: Fr,
     ) -> Self {
         Self {
-            secret: Some(secret),
-            balance: Some(balance),
-            salt: Some(salt),
+            secret: Some(leaf.secret()),
+            balance: Some(leaf.balance()),
+            salt: Some(leaf.salt()),
+            nonce: Some(leaf.nonce()),
             index_bits: Some(index_bits),
             path: Some(path),
             root: Some(root),
@@ -52,6 +55,7 @@ impl<const T: usize> ConstraintSynthesizer<Fr> for NullifierCircuit<T> {
             State::witness(&cs, self.secret.unwrap_or_default())?,
             State::witness(&cs, self.balance.unwrap_or_default())?,
             State::witness(&cs, self.salt.unwrap_or_default())?,
+            State::witness(&cs, self.nonce.unwrap_or_default())?,
         );
         let index_bits: [State; T] =
             State::witness_array(&cs, &self.index_bits.unwrap_or([Fr::ZERO; T]))?;
@@ -79,7 +83,7 @@ impl<const T: usize> ConstraintSynthesizer<Fr> for NullifierCircuit<T> {
             LinearCombination::from(input_root.var()),
         )?;
 
-        let derived_nullifier = derive_nullifier(&cs, leaf.secret(), &index_bits)?;
+        let derived_nullifier = derive_nullifier(&cs, leaf.secret(), leaf.nonce(), &index_bits)?;
 
         // Enforce: derived nullifier = input nullifier
         cs.enforce_constraint(

@@ -9,14 +9,16 @@ pub struct LeafData {
     secret: Fr,
     balance: Fr,
     salt: Fr,
+    nonce: Fr,
 }
 
 impl LeafData {
-    pub fn new(secret: Fr, balance: Fr, salt: Fr) -> Self {
+    pub fn new(secret: Fr, balance: Fr, salt: Fr, nonce: Fr) -> Self {
         Self {
             secret,
             balance,
             salt,
+            nonce,
         }
     }
 
@@ -31,6 +33,10 @@ impl LeafData {
     pub fn salt(&self) -> Fr {
         self.salt
     }
+
+    pub fn nonce(&self) -> Fr {
+        self.nonce
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -38,14 +44,16 @@ pub struct LeafState {
     secret: State,
     balance: State,
     salt: State,
+    nonce: State,
 }
 
 impl LeafState {
-    pub fn new(secret: State, balance: State, salt: State) -> Self {
+    pub fn new(secret: State, balance: State, salt: State, nonce: State) -> Self {
         Self {
             secret,
             balance,
             salt,
+            nonce,
         }
     }
 
@@ -61,7 +69,15 @@ impl LeafState {
         self.salt
     }
 
+    pub fn nonce(&self) -> State {
+        self.nonce
+    }
+
     pub fn set_balance(&mut self, balance: State) {
         self.balance = balance;
+    }
+
+    pub fn set_nonce(&mut self, new_nonce: State) {
+        self.nonce = new_nonce
     }
 }

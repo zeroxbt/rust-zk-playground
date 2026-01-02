@@ -144,6 +144,10 @@ impl<const D: usize> AccountProofVar<D> {
         self.account.set_balance(new_balance);
     }
 
+    pub fn set_nonce(&mut self, new_nonce: State) {
+        self.account.set_nonce(new_nonce)
+    }
+
     pub fn index_bits(&self) -> &[State; D] {
         self.membership.index_bits()
     }

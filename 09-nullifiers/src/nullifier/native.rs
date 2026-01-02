@@ -4,10 +4,13 @@ use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::Spong
 
 use crate::nullifier::spec::NULLIFIER_DST;
 
-pub fn derive_nullifier<const T: usize>(secret: Fr, index_bits: &[bool; T]) -> Fr {
+pub fn derive_nullifier<const T: usize>(secret: Fr, nonce: Fr, index_bits: &[bool; T]) -> Fr {
     let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
 
-    sponge.hash_with_dst(&[secret, bits_to_field(index_bits)], Some(NULLIFIER_DST))
+    sponge.hash_with_dst(
+        &[secret, bits_to_field(index_bits), nonce],
+        Some(NULLIFIER_DST),
+    )
 }
 
 pub fn bits_to_field(bits: &[bool]) -> Fr {
