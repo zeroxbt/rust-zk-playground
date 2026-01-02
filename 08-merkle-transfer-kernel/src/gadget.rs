@@ -244,3 +244,31 @@ pub fn range_check<const T: usize>(
 
     Ok(())
 }
+
+/// Patch the receiver's authentication path by selecting the divergence point between
+/// sender and receiver indices (root-most difference) and swapping in the sender's spine value.
+pub fn patch_receiver_path<const D: usize>(
+    cs: &ConstraintSystemRef<Fr>,
+    sender_index_bits: &[State; D],
+    receiver_index_bits: &[State; D],
+    sender_spine: &[State; D],
+    receiver_path: &[State; D],
+) -> Result<[State; D], SynthesisError> {
+    // first_difference_selectors walks inputs from index 0 upward, which is leaf-to-root,
+    // so reverse to make it root-to-leaf, then flip selectors back.
+    let mut ib_s = *sender_index_bits;
+    ib_s.reverse();
+    let mut ib_r = *receiver_index_bits;
+    ib_r.reverse();
+    let (mut selectors, found) = first_difference_selectors(cs, &ib_s, &ib_r)?;
+    selectors.reverse();
+
+    cs.enforce_constraint(
+        LinearCombination::from(found.var()),
+        LinearCombination::from(Variable::One),
+        LinearCombination::from(Variable::One),
+    )?;
+    enforce_one_hot(cs, &selectors)?;
+    let new_val = select_from_array(cs, &selectors, sender_spine)?;
+    update_one_slot(cs, &selectors, receiver_path, new_val)
+}

@@ -5,8 +5,7 @@ use ark_relations::r1cs::{
 };
 use hash_preimage::sponge::gadget::{SpongeGadget, State};
 use merkle_transfer_kernel::gadget::{
-    compute_root_with_spine, enforce_bit_array, enforce_one_hot, first_difference_selectors,
-    range_check, select_from_array, update_one_slot,
+    compute_root_with_spine, enforce_bit_array, patch_receiver_path, range_check,
 };
 use nullifiers::commitment::{gadget::create_commitment, spec::LeafState};
 
@@ -130,22 +129,14 @@ fn transfer<const D: usize>(
         tx_var.sender().membership().index_bits(),
     )?;
 
-    let (selectors, found) = first_difference_selectors(
+    let new_receiver_path = patch_receiver_path(
         cs,
         tx_var.sender().membership().index_bits(),
         tx_var.receiver().membership().index_bits(),
+        &spine,
+        tx_var.receiver().membership().path(),
     )?;
-    cs.enforce_constraint(
-        LinearCombination::from(found.var()),
-        LinearCombination::from(Variable::One),
-        LinearCombination::from(Variable::One),
-    )?;
-    enforce_one_hot(cs, &selectors)?;
-    let new_val = select_from_array(cs, &selectors, &spine)?;
-    let receiver_path = *tx_var.receiver().membership().path();
-    tx_var
-        .receiver_mut()
-        .set_path(update_one_slot(cs, &selectors, &receiver_path, new_val)?);
+    tx_var.receiver_mut().set_path(new_receiver_path);
 
     let (computed_root_receiver, _) = compute_root_with_spine(
         cs,

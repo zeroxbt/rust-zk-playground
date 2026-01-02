@@ -8,10 +8,7 @@ use hash_preimage::{
     sponge::gadget::{SpongeGadget, State},
 };
 
-use crate::gadget::{
-    compute_root_with_spine, enforce_bit_array, enforce_one_hot, first_difference_selectors,
-    range_check, select_from_array, update_one_slot,
-};
+use crate::gadget::{compute_root_with_spine, enforce_bit_array, patch_receiver_path, range_check};
 
 pub const DEPTH: usize = 8;
 
@@ -70,15 +67,7 @@ impl ConstraintSynthesizer<Fr> for MerkleTransferKernelCircuit {
         let (mid_root_s_updated, spine) =
             compute_root_with_spine(&cs, &sponge, leaf_s_updated, &path_s, &index_bits_s)?;
 
-        let (selectors, found) = first_difference_selectors(&cs, &index_bits_s, &index_bits_r)?;
-        cs.enforce_constraint(
-            LinearCombination::from(found.var()),
-            LinearCombination::from(Variable::One),
-            LinearCombination::from(Variable::One),
-        )?;
-        enforce_one_hot(&cs, &selectors)?;
-        let new_val = select_from_array(&cs, &selectors, &spine)?;
-        path_r = update_one_slot(&cs, &selectors, &path_r, new_val)?;
+        path_r = patch_receiver_path(&cs, &index_bits_s, &index_bits_r, &spine, &path_r)?;
 
         let (mid_root_r, _) =
             compute_root_with_spine(&cs, &sponge, leaf_r, &path_r, &index_bits_r)?;
@@ -139,6 +128,7 @@ mod tests {
     use ark_relations::r1cs::ConstraintSystem;
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
     use merkle_membership::merkle::spec::MERKLE_NODE_DST;
+    use crate::gadget::{enforce_one_hot, first_difference_selectors};
 
     // ========================================================================
     // TEST DATA GENERATION HELPERS
@@ -1239,6 +1229,114 @@ mod tests {
         println!(
             "✓ Divergence at depth {} (DEPTH-1) works correctly",
             divergence_depth
+        );
+    }
+
+    // Helper: build a sparse tree with two populated leaves at arbitrary indices.
+    // Returns (leaf_s, leaf_r, path_s, path_r, index_bits_s, index_bits_r, root)
+    fn build_sparse_two_leaf_tree(
+        sender_idx: usize,
+        sender_balance: u64,
+        receiver_idx: usize,
+        receiver_balance: u64,
+    ) -> (
+        Fr,
+        Fr,
+        [Fr; DEPTH],
+        [Fr; DEPTH],
+        [Fr; DEPTH],
+        [Fr; DEPTH],
+        Fr,
+    ) {
+        let mut leaves = vec![Fr::ZERO; 1 << DEPTH];
+        leaves[sender_idx] = Fr::from(sender_balance);
+        leaves[receiver_idx] = Fr::from(receiver_balance);
+
+        let index_bits = |idx: usize| -> [Fr; DEPTH] {
+            let mut bits = [Fr::ZERO; DEPTH];
+            for i in 0..DEPTH {
+                if (idx >> i) & 1 == 1 {
+                    bits[i] = Fr::ONE;
+                }
+            }
+            bits
+        };
+        let index_bits_s = index_bits(sender_idx);
+        let index_bits_r = index_bits(receiver_idx);
+
+        let mut path_s = [Fr::ZERO; DEPTH];
+        let mut path_r = [Fr::ZERO; DEPTH];
+
+        let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
+        let mut level = leaves;
+        let mut idx_s = sender_idx;
+        let mut idx_r = receiver_idx;
+        for d in 0..DEPTH {
+            path_s[d] = level[idx_s ^ 1];
+            path_r[d] = level[idx_r ^ 1];
+
+            let mut next = vec![Fr::ZERO; level.len() / 2];
+            for i in 0..next.len() {
+                let left = level[2 * i];
+                let right = level[2 * i + 1];
+                next[i] = sponge.hash_with_dst(&[left, right], Some(MERKLE_NODE_DST));
+            }
+            level = next;
+            idx_s >>= 1;
+            idx_r >>= 1;
+        }
+
+        let root = level[0];
+        (
+            Fr::from(sender_balance),
+            Fr::from(receiver_balance),
+            path_s,
+            path_r,
+            index_bits_s,
+            index_bits_r,
+            root,
+        )
+    }
+
+    #[test]
+    fn test_multi_bit_divergence_indices() {
+        // Sender and receiver differ in multiple bits; divergence should be taken
+        // at the root-most differing bit (tests the selector order).
+        let sender_idx = 0b0001usize;
+        let receiver_idx = 0b1100usize;
+
+        let (leaf_s, leaf_r, path_s, path_r, index_bits_s, index_bits_r, old_root) =
+            build_sparse_two_leaf_tree(sender_idx, 1_000, receiver_idx, 500);
+
+        let amount = Fr::from(300u64);
+
+        // Apply transfer natively to get expected new root.
+        let (leaf_s_after, leaf_r_after, path_s_after, path_r_after, _, _, new_root) =
+            build_sparse_two_leaf_tree(sender_idx, 700, receiver_idx, 800);
+
+        // Sanity: paths remain valid for updated leaves
+        assert_eq!(
+            compute_native_root(leaf_s_after, &path_s_after, &index_bits_s),
+            compute_native_root(leaf_r_after, &path_r_after, &index_bits_r),
+        );
+
+        let circuit = MerkleTransferKernelCircuit {
+            leaf_s: Some(leaf_s),
+            leaf_r: Some(leaf_r),
+            path_s: Some(path_s),
+            path_r: Some(path_r),
+            index_bits_s: Some(index_bits_s),
+            index_bits_r: Some(index_bits_r),
+            amount: Some(amount),
+            old_root: Some(old_root),
+            new_root: Some(new_root),
+        };
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        circuit.generate_constraints(cs.clone()).unwrap();
+        assert!(
+            cs.is_satisfied().unwrap(),
+            "Transfer with multi-bit differing indices should succeed"
         );
     }
 
