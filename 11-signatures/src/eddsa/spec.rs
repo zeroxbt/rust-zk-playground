@@ -4,7 +4,7 @@ use crate::curve::{gadget::PointVar, spec::Point};
 
 pub struct Signature {
     pub r: Point,
-    pub s: Vec<bool>,
+    pub s: [bool; 256],
 }
 
 pub struct SignatureVar {

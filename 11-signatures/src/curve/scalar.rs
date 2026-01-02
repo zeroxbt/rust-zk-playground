@@ -40,11 +40,11 @@ impl Scalar {
         Scalar((&self.0 * &rhs.0) % r)
     }
 
-    pub fn to_bits_be_fixed(&self, nbits: usize) -> Vec<bool> {
+    pub fn to_bits_be<const T: usize>(&self) -> [bool; T] {
         let bytes = self.0.to_bytes_be();
-        let mut bits = vec![false; nbits];
+        let mut bits = [false; T];
 
-        let mut bit_pos = nbits;
+        let mut bit_pos = T;
         for b in bytes.iter().rev() {
             for i in 0..8 {
                 if bit_pos == 0 {
@@ -65,20 +65,17 @@ impl Scalar {
 fn test_scalar_to_bits_be_fixed() {
     // 5 in binary is 101
     let five = Scalar(BigUint::from(5u64));
-    let bits = five.to_bits_be_fixed(8);
-    assert_eq!(
-        bits,
-        vec![false, false, false, false, false, true, false, true]
-    );
+    let bits = five.to_bits_be::<8>();
+    assert_eq!(bits, [false, false, false, false, false, true, false, true]);
 }
 
 #[test]
 fn test_scalar_to_bits_be_fixed_larger() {
     // 256 = 2^8 = 100000000 in binary
     let n = Scalar(BigUint::from(256u64));
-    let bits = n.to_bits_be_fixed(16);
+    let bits = n.to_bits_be::<16>();
     // Should be: 0000000100000000
-    assert_eq!(bits[..7], vec![false; 7]);
+    assert_eq!(bits[..7], [false; 7]);
     assert!(bits[7]);
-    assert_eq!(bits[8..], vec![false; 8]);
+    assert_eq!(bits[8..], [false; 8]);
 }

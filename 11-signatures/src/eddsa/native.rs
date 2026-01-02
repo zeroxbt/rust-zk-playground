@@ -21,8 +21,8 @@ pub fn sign(sk_fr: Fr, msg: Fr) -> Signature {
     let r_fr = sponge.hash(&[sk_fr, msg]);
     let r = Scalar::from_fr_reduced(r_fr);
 
-    let r_point = scalar_mul(&r.to_bits_be_fixed(256), &g);
-    let pk = scalar_mul(&sk.to_bits_be_fixed(256), &g);
+    let r_point = scalar_mul(&r.to_bits_be::<256>(), &g);
+    let pk = scalar_mul(&sk.to_bits_be::<256>(), &g);
 
     // h = H(R, A, msg) mod r
     let h_fr = sponge.hash(&[r_point.x(), r_point.y(), pk.x(), pk.y(), msg]);
@@ -33,7 +33,7 @@ pub fn sign(sk_fr: Fr, msg: Fr) -> Signature {
 
     Signature {
         r: r_point,
-        s: s.to_bits_be_fixed(256),
+        s: s.to_bits_be::<256>(),
     }
 }
 
@@ -44,7 +44,7 @@ pub fn verify(pk: &Point, msg: Fr, sig: &Signature) -> bool {
     let h = Scalar::from_fr_reduced(h_fr);
 
     let lhs = scalar_mul(&sig.s, &Point::generator());
-    let rhs = add(&sig.r, &scalar_mul(&h.to_bits_be_fixed(256), pk));
+    let rhs = add(&sig.r, &scalar_mul(&h.to_bits_be::<256>(), pk));
 
     // Cofactor = 8 safety
     mul_by_cofactor_8(&lhs) == mul_by_cofactor_8(&rhs)
@@ -86,7 +86,7 @@ mod tests {
 
     fn public_key_from_secret(sk_fr: Fr) -> Point {
         let sk = Scalar::from_fr_reduced(sk_fr);
-        scalar_mul(&sk.to_bits_be_fixed(256), &Point::generator())
+        scalar_mul(&sk.to_bits_be::<256>(), &Point::generator())
     }
 
     // ============================================================
@@ -277,7 +277,7 @@ mod tests {
         // Tamper with R by using a different point
         let tampered_sig = Signature {
             r: Point::generator(), // Wrong R
-            s: sig.s.clone(),
+            s: sig.s,
         };
 
         let valid = verify(&pk, msg, &tampered_sig);
@@ -294,7 +294,7 @@ mod tests {
 
         let tampered_sig = Signature {
             r: sig.r.negate(),
-            s: sig.s.clone(),
+            s: sig.s,
         };
 
         let valid = verify(&pk, msg, &tampered_sig);
@@ -311,7 +311,7 @@ mod tests {
 
         let tampered_sig = Signature {
             r: Point::identity(),
-            s: sig.s.clone(),
+            s: sig.s,
         };
 
         let valid = verify(&pk, msg, &tampered_sig);
@@ -327,7 +327,7 @@ mod tests {
         let sig = sign(sk, msg);
 
         // Flip a bit in s
-        let mut tampered_s = sig.s.clone();
+        let mut tampered_s = sig.s;
         if !tampered_s.is_empty() {
             tampered_s[0] = !tampered_s[0];
         }
@@ -351,7 +351,7 @@ mod tests {
 
         let tampered_sig = Signature {
             r: sig.r,
-            s: vec![false; sig.s.len()],
+            s: [false; 256],
         };
 
         let valid = verify(&pk, msg, &tampered_sig);
@@ -368,7 +368,7 @@ mod tests {
 
         let tampered_sig = Signature {
             r: sig.r,
-            s: vec![true; sig.s.len()],
+            s: [true; 256],
         };
 
         let valid = verify(&pk, msg, &tampered_sig);

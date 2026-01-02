@@ -60,7 +60,7 @@ pub fn verify(
     let lhs = scalar_mul(cs, s, &PointVar::generator(cs)?)?;
     let mut scalar_bits = to_bits_le_fixed(cs, h_fr)?;
     scalar_bits.reverse();
-    let rhs = add(cs, &r, &scalar_mul(cs, &scalar_bits, pk)?)?;
+    let rhs = add(cs, r, &scalar_mul(cs, &scalar_bits, pk)?)?;
 
     cs.enforce_constraint(
         LinearCombination::from(lhs.x().var()),
@@ -93,7 +93,7 @@ mod tests {
     fn sample_keypair() -> (Fr, Point) {
         let sk = Fr::from(123456789u64);
         let sk_scalar = Scalar::from_fr_reduced(sk);
-        let pk = curve_native::scalar_mul(&sk_scalar.to_bits_be_fixed(256), &Point::generator());
+        let pk = curve_native::scalar_mul(&sk_scalar.to_bits_be::<256>(), &Point::generator());
         (sk, pk)
     }
 
@@ -159,8 +159,7 @@ mod tests {
             let cs = ConstraintSystem::<Fr>::new_ref();
             let sk = Fr::from(i as u64 * 11111);
             let sk_scalar = Scalar::from_fr_reduced(sk);
-            let pk =
-                curve_native::scalar_mul(&sk_scalar.to_bits_be_fixed(256), &Point::generator());
+            let pk = curve_native::scalar_mul(&sk_scalar.to_bits_be::<256>(), &Point::generator());
             let msg = Fr::from(42u64);
 
             let sig = eddsa_native::sign(sk, msg);
@@ -211,7 +210,7 @@ mod tests {
         let wrong_sk = Fr::from(987654321u64);
         let wrong_sk_scalar = Scalar::from_fr_reduced(wrong_sk);
         let wrong_pk =
-            curve_native::scalar_mul(&wrong_sk_scalar.to_bits_be_fixed(256), &Point::generator());
+            curve_native::scalar_mul(&wrong_sk_scalar.to_bits_be::<256>(), &Point::generator());
 
         let sig = eddsa_native::sign(sk, msg);
 
@@ -257,7 +256,7 @@ mod tests {
         let sig = eddsa_native::sign(sk, msg);
 
         // Tamper with s - flip first bit
-        let mut wrong_s = sig.s.clone();
+        let mut wrong_s = sig.s;
         wrong_s[0] = !wrong_s[0];
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
