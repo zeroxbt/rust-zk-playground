@@ -129,8 +129,8 @@ mod tests {
         // Witness inputs
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         // Verify in circuit
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
@@ -151,8 +151,8 @@ mod tests {
 
             let pk_var = PointVar::from_point(&cs, &pk).unwrap();
             let msg_var = State::witness(&cs, msg).unwrap();
-            let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-            let s_bits = witness_bits_fixed(&cs, &sig.s);
+            let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+            let s_bits = witness_bits_fixed(&cs, sig.s());
 
             verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -174,8 +174,8 @@ mod tests {
 
             let pk_var = PointVar::from_point(&cs, &pk).unwrap();
             let msg_var = State::witness(&cs, msg).unwrap();
-            let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-            let s_bits = witness_bits_fixed(&cs, &sig.s);
+            let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+            let s_bits = witness_bits_fixed(&cs, sig.s());
 
             verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -199,8 +199,8 @@ mod tests {
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, wrong_msg).unwrap(); // Wrong message
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -224,8 +224,8 @@ mod tests {
 
         let pk_var = PointVar::from_point(&cs, &wrong_pk).unwrap(); // Wrong PK
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -247,7 +247,7 @@ mod tests {
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
         let r_var = PointVar::from_point(&cs, &wrong_r).unwrap(); // Wrong R
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -264,12 +264,12 @@ mod tests {
         let sig = eddsa_native::sign(sk, msg);
 
         // Tamper with s - flip first bit
-        let mut wrong_s = sig.s;
+        let mut wrong_s = *sig.s();
         wrong_s[0] = !wrong_s[0];
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
         let s_bits = witness_bits_fixed(&cs, &wrong_s); // Wrong s
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
@@ -288,8 +288,8 @@ mod tests {
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r.negate()).unwrap(); // Negated R
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, &sig.r().negate()).unwrap(); // Negated R
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -310,7 +310,7 @@ mod tests {
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
         let s_bits = witness_bits_fixed(&cs, &zero_s);
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
@@ -333,8 +333,8 @@ mod tests {
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -352,8 +352,8 @@ mod tests {
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 
@@ -375,8 +375,8 @@ mod tests {
 
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         let before = cs.num_constraints();
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
@@ -415,8 +415,8 @@ mod tests {
         let cs = ConstraintSystem::<Fr>::new_ref();
         let pk_var = PointVar::from_point(&cs, &pk).unwrap();
         let msg_var = State::witness(&cs, msg).unwrap();
-        let r_var = PointVar::from_point(&cs, &sig.r).unwrap();
-        let s_bits = witness_bits_fixed(&cs, &sig.s);
+        let r_var = PointVar::from_point(&cs, sig.r()).unwrap();
+        let s_bits = witness_bits_fixed(&cs, sig.s());
 
         verify(&cs, &pk_var, msg_var, &s_bits, &r_var).unwrap();
 

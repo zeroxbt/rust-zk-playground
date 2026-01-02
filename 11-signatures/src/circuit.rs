@@ -82,8 +82,8 @@ mod tests {
         let sig: Signature = sign(sk_fr, msg);
         let pk = pk_from_sk_fr(sk_fr);
 
-        let r = sig.r;
-        let s_fr_bits = bool_bits_to_fr_bits(&sig.s);
+        let r = sig.r().clone();
+        let s_fr_bits = bool_bits_to_fr_bits(sig.s());
 
         (pk, r, s_fr_bits, msg)
     }

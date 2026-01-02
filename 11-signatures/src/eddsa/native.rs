@@ -34,23 +34,20 @@ pub fn sign(sk_fr: Fr, msg: Fr) -> Signature {
     // s = r + h*sk mod r
     let s = r.add(&h.mul(&sk));
 
-    Signature {
-        r: r_point,
-        s: s.to_bits_be::<256>(),
-    }
+    Signature::new(r_point, s.to_bits_be::<256>())
 }
 
 pub fn verify(pk: &Point, msg: Fr, sig: &Signature) -> bool {
     let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
 
     let h_fr = sponge.hash_with_dst(
-        &[sig.r.x(), sig.r.y(), pk.x(), pk.y(), msg],
+        &[sig.r().x(), sig.r().y(), pk.x(), pk.y(), msg],
         Some(SIG_HASH_DST),
     );
     let h = Scalar::from_fr_reduced(h_fr);
 
-    let lhs = scalar_mul(&sig.s, &Point::generator());
-    let rhs = add(&sig.r, &scalar_mul(&h.to_bits_be::<256>(), pk));
+    let lhs = scalar_mul(sig.s(), &Point::generator());
+    let rhs = add(sig.r(), &scalar_mul(&h.to_bits_be::<256>(), pk));
 
     // Cofactor = 8 safety
     mul_by_cofactor_8(&lhs) == mul_by_cofactor_8(&rhs)
@@ -159,8 +156,8 @@ mod tests {
         let sig1 = sign(sk, msg);
         let sig2 = sign(sk, msg);
 
-        assert_eq!(sig1.r, sig2.r, "Same inputs should produce same R");
-        assert_eq!(sig1.s, sig2.s, "Same inputs should produce same s");
+        assert_eq!(sig1.r(), sig2.r(), "Same inputs should produce same R");
+        assert_eq!(sig1.s(), sig2.s(), "Same inputs should produce same s");
     }
 
     #[test]
@@ -173,7 +170,7 @@ mod tests {
         let sig2 = sign(sk, msg2);
 
         assert!(
-            sig1.r != sig2.r || sig1.s != sig2.s,
+            sig1.r() != sig2.r() || sig1.s() != sig2.s(),
             "Different messages should produce different signatures"
         );
     }
@@ -188,7 +185,7 @@ mod tests {
         let sig2 = sign(sk2, msg);
 
         assert!(
-            sig1.r != sig2.r || sig1.s != sig2.s,
+            sig1.r() != sig2.r() || sig1.s() != sig2.s(),
             "Different keys should produce different signatures"
         );
     }
@@ -281,10 +278,7 @@ mod tests {
         let sig = sign(sk, msg);
 
         // Tamper with R by using a different point
-        let tampered_sig = Signature {
-            r: Point::generator(), // Wrong R
-            s: sig.s,
-        };
+        let tampered_sig = Signature::new(Point::generator(), *sig.s());
 
         let valid = verify(&pk, msg, &tampered_sig);
         assert!(!valid, "Signature should not verify with tampered R");
@@ -298,10 +292,7 @@ mod tests {
 
         let sig = sign(sk, msg);
 
-        let tampered_sig = Signature {
-            r: sig.r.negate(),
-            s: sig.s,
-        };
+        let tampered_sig = Signature::new(sig.r().negate(), *sig.s());
 
         let valid = verify(&pk, msg, &tampered_sig);
         assert!(!valid, "Signature should not verify with negated R");
@@ -315,10 +306,7 @@ mod tests {
 
         let sig = sign(sk, msg);
 
-        let tampered_sig = Signature {
-            r: Point::identity(),
-            s: sig.s,
-        };
+        let tampered_sig = Signature::new(Point::identity(), *sig.s());
 
         let valid = verify(&pk, msg, &tampered_sig);
         assert!(!valid, "Signature should not verify with identity R");
@@ -333,15 +321,12 @@ mod tests {
         let sig = sign(sk, msg);
 
         // Flip a bit in s
-        let mut tampered_s = sig.s;
+        let mut tampered_s = *sig.s();
         if !tampered_s.is_empty() {
             tampered_s[0] = !tampered_s[0];
         }
 
-        let tampered_sig = Signature {
-            r: sig.r,
-            s: tampered_s,
-        };
+        let tampered_sig = Signature::new(sig.r().clone(), tampered_s);
 
         let valid = verify(&pk, msg, &tampered_sig);
         assert!(!valid, "Signature should not verify with tampered s");
@@ -355,10 +340,7 @@ mod tests {
 
         let sig = sign(sk, msg);
 
-        let tampered_sig = Signature {
-            r: sig.r,
-            s: [false; 256],
-        };
+        let tampered_sig = Signature::new(sig.r().clone(), [false; 256]);
 
         let valid = verify(&pk, msg, &tampered_sig);
         assert!(!valid, "Signature should not verify with all-zero s");
@@ -372,10 +354,7 @@ mod tests {
 
         let sig = sign(sk, msg);
 
-        let tampered_sig = Signature {
-            r: sig.r,
-            s: [true; 256],
-        };
+        let tampered_sig = Signature::new(sig.r().clone(), [true; 256]);
 
         let valid = verify(&pk, msg, &tampered_sig);
         assert!(!valid, "Signature should not verify with all-one s");
@@ -392,7 +371,7 @@ mod tests {
 
         let sig = sign(sk, msg);
 
-        assert!(sig.r.is_on_curve(), "Signature R should be on curve");
+        assert!(sig.r().is_on_curve(), "Signature R should be on curve");
     }
 
     #[test]
@@ -403,7 +382,7 @@ mod tests {
         let sig = sign(sk, msg);
 
         assert_ne!(
-            sig.r,
+            *sig.r(),
             Point::identity(),
             "Signature R should not be identity"
         );
@@ -416,7 +395,7 @@ mod tests {
 
         let sig = sign(sk, msg);
 
-        assert!(!sig.s.is_empty(), "Signature s should not be empty");
+        assert!(!sig.s().is_empty(), "Signature s should not be empty");
     }
 
     // ============================================================

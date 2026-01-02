@@ -5,9 +5,10 @@ use hash_preimage::sponge::gadget::State;
 
 use crate::curve::spec::{D, Point};
 
+#[derive(Clone, Debug)]
 pub struct PointVar {
-    pub x: State,
-    pub y: State,
+    x: State,
+    y: State,
 }
 
 impl PointVar {
