@@ -115,6 +115,64 @@ pub fn add(
     Ok(PointVar::new(x, y))
 }
 
+/// Select between two points based on a bit.
+///
+/// If bit {return p1} else {return p0}
+/// Precondition: b ∈ {0,1}
+pub fn select(
+    cs: &ConstraintSystemRef<Fr>,
+    bit: &State,
+    p1: &PointVar,
+    p0: &PointVar,
+) -> Result<PointVar, SynthesisError> {
+    let out_x_val = if bit.val() == Fr::ONE {
+        p1.x.val()
+    } else {
+        p0.x.val()
+    };
+    let out_x = State::witness(cs, out_x_val)?;
+
+    cs.enforce_constraint(
+        LinearCombination::from(bit.var()),
+        LinearCombination::from(p1.x.var()) - p0.x.var(),
+        LinearCombination::from(out_x.var()) - p0.x.var(),
+    )?;
+
+    let out_y_val = if bit.val() == Fr::ONE {
+        p1.y.val()
+    } else {
+        p0.y.val()
+    };
+    let out_y = State::witness(cs, out_y_val)?;
+
+    cs.enforce_constraint(
+        LinearCombination::from(bit.var()),
+        LinearCombination::from(p1.y.var()) - p0.y.var(),
+        LinearCombination::from(out_y.var()) - p0.y.var(),
+    )?;
+
+    Ok(PointVar::new(out_x, out_y))
+}
+
+/// Scalar multiplication via double-and-add.
+///
+/// Precondition: b ∈ {0,1}
+pub fn scalar_mul(
+    cs: &ConstraintSystemRef<Fr>,
+    scalar_bits_be: &[State],
+    point: &PointVar,
+) -> Result<PointVar, SynthesisError> {
+    let mut result = PointVar::identity();
+    for bit in scalar_bits_be.iter() {
+        let p0 = add(cs, &result, &result)?;
+        let p1 = add(cs, &p0, point)?;
+
+        result = select(cs, bit, &p1, &p0)?;
+    }
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -461,6 +519,542 @@ mod tests {
         assert!(
             !cs.is_satisfied().unwrap(),
             "Wrong x witness should not satisfy constraints"
+        );
+    }
+
+    // ============================================================
+    // SELECT TESTS
+    // ============================================================
+
+    #[test]
+    fn test_select_bit_one_returns_first() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let two_g = native::add(&g, &g);
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        let two_gv = PointVar::from_point(&cs, &two_g).unwrap();
+        let bit = State::witness(&cs, Fr::ONE).unwrap();
+
+        let result = select(&cs, &bit, &gv, &two_gv).unwrap();
+
+        assert_point_eq(&result, &g, "select(1, G, 2G) = G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_select_bit_zero_returns_second() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let two_g = native::add(&g, &g);
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        let two_gv = PointVar::from_point(&cs, &two_g).unwrap();
+        let bit = State::witness(&cs, Fr::ZERO).unwrap();
+
+        let result = select(&cs, &bit, &gv, &two_gv).unwrap();
+
+        assert_point_eq(&result, &two_g, "select(0, G, 2G) = 2G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_select_same_point() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        let bit = State::witness(&cs, Fr::ONE).unwrap();
+
+        let result = select(&cs, &bit, &gv, &gv).unwrap();
+
+        assert_point_eq(&result, &g, "select(1, G, G) = G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_select_constraint_count() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let two_g = native::add(&g, &g);
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        let two_gv = PointVar::from_point(&cs, &two_g).unwrap();
+        let bit = State::witness(&cs, Fr::ONE).unwrap();
+
+        let before = cs.num_constraints();
+        let _ = select(&cs, &bit, &gv, &two_gv).unwrap();
+        let after = cs.num_constraints();
+
+        assert_eq!(after - before, 2, "select should use 2 constraints");
+    }
+
+    // ============================================================
+    // SCALAR_MUL - BASIC TESTS
+    // ============================================================
+
+    #[test]
+    fn test_scalar_mul_by_zero() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        let bits: Vec<State> = vec![];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &Point::identity(), "[0]G = O");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_one() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        // 1 in big-endian binary is [true] -> [1]
+        let bits = vec![State::witness(&cs, Fr::ONE).unwrap()];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &g, "[1]G = G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_two() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let two_g = native::double(&g);
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        // 2 in big-endian binary is [1, 0]
+        let bits = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &two_g, "[2]G = 2G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_three() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let three_g = native::add(&native::double(&g), &g);
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        // 3 in big-endian binary is [1, 1]
+        let bits = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &three_g, "[3]G = 3G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_four() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let four_g = native::double(&native::double(&g));
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        // 4 in big-endian binary is [1, 0, 0]
+        let bits = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &four_g, "[4]G = 4G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_five() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let five_g = native::add(&native::double(&native::double(&g)), &g);
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        // 5 in big-endian binary is [1, 0, 1]
+        let bits = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &five_g, "[5]G = 5G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_seven() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        // 7G = 4G + 2G + G
+        let two_g = native::double(&g);
+        let four_g = native::double(&two_g);
+        let seven_g = native::add(&native::add(&four_g, &two_g), &g);
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        // 7 in big-endian binary is [1, 1, 1]
+        let bits = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &seven_g, "[7]G = 7G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_eight() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let eight_g = native::double(&native::double(&native::double(&g)));
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+        // 8 in big-endian binary is [1, 0, 0, 0]
+        let bits = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &eight_g, "[8]G = 8G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    // ============================================================
+    // SCALAR_MUL - CONSISTENCY WITH NATIVE
+    // ============================================================
+
+    #[test]
+    fn test_scalar_mul_matches_native() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // Test scalar 42 = 0b101010
+        let scalar_bits_native = vec![true, false, true, false, true, false];
+        let scalar_bits_gadget: Vec<State> = scalar_bits_native
+            .iter()
+            .map(|&b| State::witness(&cs, if b { Fr::ONE } else { Fr::ZERO }).unwrap())
+            .collect();
+
+        let result_gadget = scalar_mul(&cs, &scalar_bits_gadget, &gv).unwrap();
+        let result_native = native::scalar_mul(&scalar_bits_native, &g);
+
+        assert_point_eq(&result_gadget, &result_native, "[42]G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_matches_native_larger() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // Test scalar 255 = 0b11111111
+        let scalar_bits_native = vec![true, true, true, true, true, true, true, true];
+        let scalar_bits_gadget: Vec<State> = scalar_bits_native
+            .iter()
+            .map(|&b| State::witness(&cs, if b { Fr::ONE } else { Fr::ZERO }).unwrap())
+            .collect();
+
+        let result_gadget = scalar_mul(&cs, &scalar_bits_gadget, &gv).unwrap();
+        let result_native = native::scalar_mul(&scalar_bits_native, &g);
+
+        assert_point_eq(&result_gadget, &result_native, "[255]G");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    // ============================================================
+    // SCALAR_MUL - LEADING ZEROS
+    // ============================================================
+
+    #[test]
+    fn test_scalar_mul_leading_zeros() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // [0, 0, 1] and [1] should both give G
+        let bits_with_zeros = vec![
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+        ];
+        let bits_without = vec![State::witness(&cs, Fr::ONE).unwrap()];
+
+        let result_with = scalar_mul(&cs, &bits_with_zeros, &gv).unwrap();
+        let result_without = scalar_mul(&cs, &bits_without, &gv).unwrap();
+
+        assert_eq!(
+            result_with.x.val(),
+            result_without.x.val(),
+            "leading zeros x"
+        );
+        assert_eq!(
+            result_with.y.val(),
+            result_without.y.val(),
+            "leading zeros y"
+        );
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_scalar_mul_all_zeros() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        let bits = vec![
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &Point::identity(), "[0]G = O");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    // ============================================================
+    // SCALAR_MUL - IDENTITY POINT
+    // ============================================================
+
+    #[test]
+    fn test_scalar_mul_on_identity() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let id = Point::identity();
+
+        let idv = PointVar::from_point(&cs, &id).unwrap();
+
+        // Any scalar times identity should be identity
+        let bits = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+        ];
+
+        let result = scalar_mul(&cs, &bits, &idv).unwrap();
+
+        assert_point_eq(&result, &id, "[k]O = O");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    // ============================================================
+    // SCALAR_MUL - CONSTRAINT COUNT
+    // ============================================================
+
+    #[test]
+    fn test_scalar_mul_constraint_count() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // 8-bit scalar
+        let bits: Vec<State> = (0..8)
+            .map(|_| State::witness(&cs, Fr::ZERO).unwrap())
+            .collect();
+
+        let before = cs.num_constraints();
+        let _ = scalar_mul(&cs, &bits, &gv).unwrap();
+        let after = cs.num_constraints();
+
+        let constraints_per_bit = (after - before) / 8;
+        println!(
+            "scalar_mul uses {} constraints for 8 bits ({} per bit)",
+            after - before,
+            constraints_per_bit
+        );
+
+        // Expected: 7 (double) + 7 (add) + 2 (select) = 16 per bit
+        assert_eq!(constraints_per_bit, 16, "should be 16 constraints per bit");
+    }
+
+    // ============================================================
+    // SCALAR_MUL - DISTRIBUTIVE PROPERTY
+    // ============================================================
+
+    #[test]
+    fn test_scalar_mul_distributive() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // [2]G + [3]G should equal [5]G
+        // 2 = [1,0], 3 = [1,1], 5 = [1,0,1]
+        let bits_2 = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+        ];
+        let bits_3 = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+        ];
+        let bits_5 = vec![
+            State::witness(&cs, Fr::ONE).unwrap(),
+            State::witness(&cs, Fr::ZERO).unwrap(),
+            State::witness(&cs, Fr::ONE).unwrap(),
+        ];
+
+        let two_g = scalar_mul(&cs, &bits_2, &gv).unwrap();
+        let three_g = scalar_mul(&cs, &bits_3, &gv).unwrap();
+        let five_g = scalar_mul(&cs, &bits_5, &gv).unwrap();
+
+        let sum = add(&cs, &two_g, &three_g).unwrap();
+
+        assert_eq!(sum.x.val(), five_g.x.val(), "distributive x");
+        assert_eq!(sum.y.val(), five_g.y.val(), "distributive y");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    // ============================================================
+    // SOUNDNESS - NON-BOOLEAN BITS
+    // ============================================================
+
+    #[test]
+    fn test_scalar_mul_non_boolean_bit_wrong_result() {
+        // This test demonstrates that without boolean enforcement,
+        // a malicious prover can satisfy constraints but get wrong results.
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+        let id = Point::identity();
+
+        let idv = PointVar::from_point(&cs, &id).unwrap();
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // After first double: identity + identity = identity
+        let doubled = add(&cs, &idv, &idv).unwrap();
+
+        // After add: identity + G = G
+        let after_add = add(&cs, &doubled, &gv).unwrap();
+
+        // Malicious: use bit=2 instead of 0 or 1
+        let bad_bit = State::witness(&cs, Fr::from(2u64)).unwrap();
+
+        // Compute malicious witness: out = p0 + bit*(p1 - p0)
+        // With bit=2, p0=identity, p1=G:
+        // out_x = 0 + 2*(Gx - 0) = 2*Gx (field multiplication, NOT point doubling!)
+        // out_y = 1 + 2*(Gy - 1) = 2*Gy - 1
+        let malicious_x = doubled.x.val() + Fr::from(2u64) * (after_add.x.val() - doubled.x.val());
+        let malicious_y = doubled.y.val() + Fr::from(2u64) * (after_add.y.val() - doubled.y.val());
+
+        let out_x = State::witness(&cs, malicious_x).unwrap();
+        let out_y = State::witness(&cs, malicious_y).unwrap();
+
+        // These constraints ARE satisfied with bit=2 and malicious witness
+        cs.enforce_constraint(
+            LinearCombination::from(bad_bit.var()),
+            LinearCombination::from(after_add.x.var()) - doubled.x.var(),
+            LinearCombination::from(out_x.var()) - doubled.x.var(),
+        )
+        .unwrap();
+        cs.enforce_constraint(
+            LinearCombination::from(bad_bit.var()),
+            LinearCombination::from(after_add.y.var()) - doubled.y.var(),
+            LinearCombination::from(out_y.var()) - doubled.y.var(),
+        )
+        .unwrap();
+
+        // Constraints are satisfied
+        assert!(
+            cs.is_satisfied().unwrap(),
+            "malicious witness satisfies constraints"
+        );
+
+        // But the result is WRONG - it's not G (what [1]G should be)
+        assert!(
+            out_x.val() != g.x() || out_y.val() != g.y(),
+            "malicious result should differ from correct [1]G"
+        );
+
+        // And it's not even on the curve!
+        let malicious_point = Point::new(malicious_x, malicious_y);
+        assert!(
+            !malicious_point.is_on_curve(),
+            "malicious result is not even on the curve"
+        );
+
+        println!("✓ Without boolean enforcement, prover can produce invalid results");
+    }
+
+    #[test]
+    fn test_scalar_mul_with_boolean_enforcement() {
+        // This test shows how to properly enforce boolean bits
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // Create bit and enforce it's boolean
+        let bit = State::witness(&cs, Fr::ONE).unwrap();
+        cs.enforce_constraint(
+            LinearCombination::from(bit.var()),
+            LinearCombination::from(bit.var()) - Variable::One,
+            LinearCombination::zero(),
+        )
+        .unwrap();
+
+        let bits = vec![bit];
+        let result = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        assert_point_eq(&result, &g, "[1]G = G with boolean enforcement");
+        assert!(cs.is_satisfied().unwrap());
+    }
+
+    #[test]
+    fn test_non_boolean_bit_fails_with_enforcement() {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let g = Point::generator();
+
+        let gv = PointVar::from_point(&cs, &g).unwrap();
+
+        // Create non-boolean bit and try to enforce it's boolean
+        let bad_bit = State::witness(&cs, Fr::from(2u64)).unwrap();
+        cs.enforce_constraint(
+            LinearCombination::from(bad_bit.var()),
+            LinearCombination::from(bad_bit.var()) - Variable::One,
+            LinearCombination::zero(),
+        )
+        .unwrap();
+
+        let bits = vec![bad_bit];
+        let _ = scalar_mul(&cs, &bits, &gv).unwrap();
+
+        // Now constraints should NOT be satisfied because 2*(2-1) ≠ 0
+        assert!(
+            !cs.is_satisfied().unwrap(),
+            "non-boolean bit with enforcement should fail"
         );
     }
 }
