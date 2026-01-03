@@ -36,10 +36,11 @@ pub fn enforce_zero_if(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::Field;
     use ark_relations::r1cs::ConstraintSystem;
+
+    use super::*;
 
     // Helper to create a State from a value
     fn state_from_value(cs: &ConstraintSystemRef<Fr>, val: Fr) -> State {

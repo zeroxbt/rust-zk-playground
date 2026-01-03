@@ -1,9 +1,10 @@
+use ark_bls12_381::Fr;
+use ark_ff::Field;
+
 use crate::{
     sponge::native::PermutationNative,
     toy_hash::spec::{TOY_HASH_SPEC, ToyHashSpec},
 };
-use ark_bls12_381::Fr;
-use ark_ff::Field;
 
 pub struct ToyHashPermutation<'a> {
     spec: &'a ToyHashSpec,

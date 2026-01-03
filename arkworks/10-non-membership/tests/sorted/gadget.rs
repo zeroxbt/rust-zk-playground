@@ -2,7 +2,6 @@ use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, BigInteger, Field, PrimeField};
 use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 use hash_preimage::sponge::gadget::State;
-
 use non_membership::sorted::{
     gadget::{less_than, verify_sorted_non_membership},
     native::{less_than as native_less_than, verify_sorted_non_membership as native_verify},

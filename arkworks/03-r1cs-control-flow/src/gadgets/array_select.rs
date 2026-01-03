@@ -39,12 +39,11 @@ pub fn select_from_array<const T: usize>(
 
 #[cfg(test)]
 mod select_from_array_tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef, LinearCombination, Variable};
 
-    use crate::gadgets::array_select::select_from_array;
-    use crate::gadgets::one_hot::enforce_one_hot;
+    use super::*;
+    use crate::gadgets::{array_select::select_from_array, one_hot::enforce_one_hot};
 
     fn witness_vals<const T: usize>(cs: &ConstraintSystemRef<Fr>, vals: [u64; T]) -> [State; T] {
         let frs: Vec<Fr> = vals.into_iter().map(Fr::from).collect();

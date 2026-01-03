@@ -24,10 +24,11 @@ pub fn select(
 
 #[cfg(test)]
 mod select_tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::AdditiveGroup;
     use ark_relations::r1cs::ConstraintSystem;
+
+    use super::*;
 
     fn w(cs: &ark_relations::r1cs::ConstraintSystemRef<Fr>, v: u64) -> State {
         State::witness(cs, Fr::from(v)).unwrap()

@@ -31,10 +31,11 @@ pub fn enforce_one_hot(
 
 #[cfg(test)]
 mod one_hot_tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::AdditiveGroup;
     use ark_relations::r1cs::ConstraintSystem;
+
+    use super::*;
 
     /// Helper: witness an array of selectors from u64s.
     fn wits<const N: usize>(

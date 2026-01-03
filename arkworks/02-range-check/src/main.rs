@@ -123,10 +123,11 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
     use ark_relations::r1cs::ConstraintSystem;
     use ark_std::test_rng;
+
+    use super::*;
 
     fn create_circuits() -> (RangePlusCircuit<Fr>, RangePlusCircuit<Fr>) {
         let n_bits = 16;

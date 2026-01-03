@@ -17,6 +17,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
+rust-version = "1.83.0"
 edition = "2024"
 
 [workspace.dependencies]
@@ -39,3 +40,13 @@ nullifiers = { path = "09-nullifiers" }
 signatures = { path = "11-signatures" }
 non-membership = { path = "10-non-membership" }
 batch-transfers = { path = "12-batch-transfers" }
+
+[workspace.lints]
+rust.unreachable_pub = "warn"
+clippy.used_underscore_binding = "warn"
+clippy.pedantic = { level = "allow", priority = -1 }
+clippy.type_complexity = "allow"
+clippy.unnecessary_wraps = "warn"
+clippy.manual_let_else = "warn"
+clippy.dbg_macro = "warn"
+clippy.unwrap_used = "warn"

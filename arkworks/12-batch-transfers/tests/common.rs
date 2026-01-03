@@ -1,11 +1,10 @@
 use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, Field, UniformRand};
+use batch_transfers::spec::{AccountProof, MembershipProof, TransferStep};
 use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
 use merkle_membership::merkle::spec::MERKLE_NODE_DST;
 use nullifiers::commitment::{native::create_commitment, spec::LeafData};
 use rand::thread_rng;
-
-use batch_transfers::spec::{AccountProof, MembershipProof, TransferStep};
 
 pub const DEPTH: usize = 4;
 

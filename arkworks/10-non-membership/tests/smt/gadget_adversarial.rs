@@ -2,7 +2,6 @@ use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 use hash_preimage::sponge::gadget::State;
-
 use non_membership::smt::{
     gadget::verify_non_membership, spec::SmtNonMembershipProofVar, tree::SparseMerkleTree,
 };

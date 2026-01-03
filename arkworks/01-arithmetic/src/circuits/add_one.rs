@@ -27,10 +27,11 @@ impl<F: Field> ConstraintSynthesizer<F> for AddOneCircuit<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::AddOneCircuit;
-    use crate::{Curve, Fr};
     use ark_groth16::{Groth16, prepare_verifying_key};
     use ark_std::test_rng;
+
+    use super::AddOneCircuit;
+    use crate::{Curve, Fr};
 
     fn prove(
         x: u64,

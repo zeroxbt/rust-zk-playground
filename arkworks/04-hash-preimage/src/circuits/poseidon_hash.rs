@@ -1,14 +1,15 @@
+use ark_bls12_381::Fr;
+use ark_ff::AdditiveGroup;
+use ark_relations::r1cs::{
+    ConstraintSynthesizer, ConstraintSystemRef, LinearCombination, SynthesisError, Variable,
+};
+
 use crate::{
     poseidon::{
         native::PoseidonPermutation,
         spec::{RATE, WIDTH},
     },
     sponge::gadget::{SpongeGadget, State},
-};
-use ark_bls12_381::Fr;
-use ark_ff::AdditiveGroup;
-use ark_relations::r1cs::{
-    ConstraintSynthesizer, ConstraintSystemRef, LinearCombination, SynthesisError, Variable,
 };
 
 #[derive(Clone, Debug)]
@@ -48,7 +49,7 @@ impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
         for x in msg {
             msg_states.push(State::witness(&cs, x)?)
         }
-        let out = sponge.hash(&cs, &msg_states, /*squeeze_lane=*/ 1)?;
+        let out = sponge.hash(&cs, &msg_states, /* squeeze_lane= */ 1)?;
 
         let h = State::input(&cs, h)?;
         cs.enforce_constraint(
@@ -63,14 +64,13 @@ impl ConstraintSynthesizer<Fr> for PoseidonHashCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
-
-    use super::*;
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
-
     use ark_relations::r1cs::ConstraintSystem;
     use ark_std::test_rng;
+
+    use super::*;
+    use crate::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
 
     fn create_circuits() -> (PoseidonHashCircuit, PoseidonHashCircuit) {
         let x0 = Fr::from(7u64);

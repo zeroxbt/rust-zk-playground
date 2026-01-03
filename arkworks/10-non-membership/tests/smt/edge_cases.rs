@@ -1,6 +1,5 @@
 use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, Field};
-
 use non_membership::smt::{native::verify_non_membership, tree::SparseMerkleTree};
 
 const TEST_DEPTH: usize = 16;

@@ -25,10 +25,11 @@ impl ConstraintSynthesizer<Fr> for NeqCircuit {
 
 #[cfg(test)]
 mod neq_circuit_tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::Field;
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
+
+    use super::*;
 
     fn run(c: NeqCircuit) -> ark_relations::r1cs::ConstraintSystemRef<Fr> {
         let cs = ConstraintSystem::<Fr>::new_ref();

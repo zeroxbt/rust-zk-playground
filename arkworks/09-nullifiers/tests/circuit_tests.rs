@@ -2,7 +2,6 @@ use ark_bls12_381::Fr;
 use ark_ff::UniformRand;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
 use ark_std::test_rng;
-
 use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
 use merkle_membership::merkle::native::compute_root as compute_root_native;
 use nullifiers::{

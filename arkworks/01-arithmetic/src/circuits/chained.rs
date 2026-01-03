@@ -45,10 +45,11 @@ impl<F: Field> ConstraintSynthesizer<F> for ChainedCircuit<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::ChainedCircuit;
-    use crate::{Curve, Fr};
     use ark_groth16::{Groth16, prepare_verifying_key};
     use ark_std::test_rng;
+
+    use super::ChainedCircuit;
+    use crate::{Curve, Fr};
 
     fn prove(
         a: u64,

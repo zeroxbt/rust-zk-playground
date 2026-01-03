@@ -38,10 +38,11 @@ impl<const T: usize> ConstraintSynthesizer<Fr> for ArraySelectCircuit<T> {
 
 #[cfg(test)]
 mod array_select_tests {
-    use crate::circuits::array_select::ArraySelectCircuit;
     use ark_bls12_381::Fr;
     use ark_ff::{AdditiveGroup, Field};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
+
+    use crate::circuits::array_select::ArraySelectCircuit;
 
     fn one_hot<const T: usize>(idx: usize) -> [Fr; T] {
         assert!(idx < T);

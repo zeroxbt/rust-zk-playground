@@ -93,19 +93,17 @@ impl<const K: usize> ConstraintSynthesizer<Fr> for MerkleOrderedUpdateCircuit<K>
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::STEP_DST;
-
-    use super::MerkleOrderedUpdateCircuit;
-
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::{AdditiveGroup, Field, UniformRand};
     use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
     use ark_std::test_rng;
-    use rand::RngCore;
-
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
     use merkle_membership::merkle::{native, spec::DEPTH};
+    use rand::RngCore;
+
+    use super::MerkleOrderedUpdateCircuit;
+    use crate::circuit::STEP_DST;
 
     const K: usize = 4;
 

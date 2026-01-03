@@ -2,8 +2,10 @@ use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, Field};
 use ark_relations::r1cs::ConstraintSystem;
 use hash_preimage::sponge::gadget::State;
-use merkle_transfer_kernel::circuit::DEPTH;
-use merkle_transfer_kernel::gadget::{enforce_one_hot, first_difference_selectors};
+use merkle_transfer_kernel::{
+    circuit::DEPTH,
+    gadget::{enforce_one_hot, first_difference_selectors},
+};
 
 /// Test helper: Manually construct selectors that violate one-hot property
 /// and verify this breaks the circuit when one-hot isn't enforced.

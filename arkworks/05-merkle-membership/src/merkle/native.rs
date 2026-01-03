@@ -23,7 +23,6 @@ mod tests {
     use ark_bls12_381::Fr;
     use ark_ff::UniformRand;
     use ark_std::test_rng;
-
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
     use rand::RngCore;
 

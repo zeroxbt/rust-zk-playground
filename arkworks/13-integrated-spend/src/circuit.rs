@@ -184,8 +184,6 @@ fn verify_signature<const D: usize>(
 
 #[cfg(test)]
 mod integrated_spend_tests {
-    use super::*;
-    use crate::spec::SpendTransaction;
     use ark_bls12_381::Fr;
     use ark_ff::{AdditiveGroup, Field, UniformRand};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
@@ -194,10 +192,15 @@ mod integrated_spend_tests {
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
     use merkle_membership::merkle::spec::MERKLE_NODE_DST;
     use non_membership::smt::tree::SparseMerkleTree;
-    use nullifiers::commitment::{native::create_commitment, spec::LeafData};
-    use nullifiers::nullifier::native as nullifier_native;
+    use nullifiers::{
+        commitment::{native::create_commitment, spec::LeafData},
+        nullifier::native as nullifier_native,
+    };
     use rand::thread_rng;
     use signatures::eddsa::native as eddsa_native;
+
+    use super::*;
+    use crate::spec::SpendTransaction;
 
     pub const DEPTH: usize = 4;
 
@@ -361,10 +364,22 @@ mod integrated_spend_tests {
         out
     }
 
-    fn spend_msg(nullifier: Fr, receiver_commitment: Fr, amount: Fr, old_state_root: Fr, old_nullifier_root: Fr) -> Fr {
+    fn spend_msg(
+        nullifier: Fr,
+        receiver_commitment: Fr,
+        amount: Fr,
+        old_state_root: Fr,
+        old_nullifier_root: Fr,
+    ) -> Fr {
         let sponge = SpongeNative::<PoseidonPermutation, 3, 2>::default();
         sponge.hash_with_dst(
-            &[nullifier, receiver_commitment, amount, old_state_root, old_nullifier_root],
+            &[
+                nullifier,
+                receiver_commitment,
+                amount,
+                old_state_root,
+                old_nullifier_root,
+            ],
             Some(SPEND_HASH_DST),
         )
     }
@@ -593,8 +608,10 @@ mod integrated_spend_tests {
     #[test]
     fn smt_membership_and_non_membership_disagree_on_empty_root() {
         use hash_preimage::sponge::gadget::State as GState;
-        use non_membership::smt::gadget::{verify_membership, verify_non_membership};
-        use non_membership::smt::spec::SmtNonMembershipProofVar;
+        use non_membership::smt::{
+            gadget::{verify_membership, verify_non_membership},
+            spec::SmtNonMembershipProofVar,
+        };
 
         let mut rng = test_rng();
         let key = Fr::rand(&mut rng);

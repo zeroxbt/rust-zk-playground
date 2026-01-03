@@ -2,8 +2,10 @@ use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, UniformRand};
 use ark_std::test_rng;
 use hash_preimage::sponge::gadget::State;
-use nullifiers::commitment::spec::LeafState;
-use nullifiers::commitment::{native::create_commitment, spec::LeafData};
+use nullifiers::commitment::{
+    native::create_commitment,
+    spec::{LeafData, LeafState},
+};
 use rand::seq::SliceRandom;
 
 // ============================================
@@ -68,8 +70,10 @@ fn non_zero_output() {
 // ============================================
 
 use ark_relations::r1cs::ConstraintSystem;
-use nullifiers::commitment::gadget::create_commitment as create_commitment_gadget;
-use nullifiers::commitment::native::create_commitment as create_commitment_native;
+use nullifiers::commitment::{
+    gadget::create_commitment as create_commitment_gadget,
+    native::create_commitment as create_commitment_native,
+};
 
 #[test]
 fn gadget_consistency_with_native() {
@@ -130,7 +134,12 @@ fn gadget_constraints_satisfied() {
 #[test]
 fn gadget_zero_balance() {
     let mut rng = test_rng();
-    let leaf = LeafData::new(Fr::rand(&mut rng), Fr::ZERO, Fr::rand(&mut rng), Fr::rand(&mut rng));
+    let leaf = LeafData::new(
+        Fr::rand(&mut rng),
+        Fr::ZERO,
+        Fr::rand(&mut rng),
+        Fr::rand(&mut rng),
+    );
 
     let cs = ConstraintSystem::<Fr>::new_ref();
     let gadget_result = create_commitment_gadget(

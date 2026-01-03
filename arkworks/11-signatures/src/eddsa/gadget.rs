@@ -86,12 +86,13 @@ pub fn verify(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::curve::native as curve_native;
-    use crate::curve::scalar::Scalar;
-    use crate::curve::spec::Point;
-    use crate::eddsa::native as eddsa_native;
     use ark_relations::r1cs::ConstraintSystem;
+
+    use super::*;
+    use crate::{
+        curve::{native as curve_native, scalar::Scalar, spec::Point},
+        eddsa::native as eddsa_native,
+    };
 
     // ============================================================
     // HELPERS

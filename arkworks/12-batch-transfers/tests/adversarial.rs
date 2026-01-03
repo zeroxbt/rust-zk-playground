@@ -1,10 +1,11 @@
 use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, Field, UniformRand};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
+use batch_transfers::{
+    circuit::BatchTransferCircuit,
+    spec::{AccountProof, MembershipProof, TransferStep},
+};
 use rand::thread_rng;
-
-use batch_transfers::circuit::BatchTransferCircuit;
-use batch_transfers::spec::{AccountProof, MembershipProof, TransferStep};
 
 mod common;
 use common::*;

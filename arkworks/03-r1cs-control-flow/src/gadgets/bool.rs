@@ -16,14 +16,13 @@ pub fn enforce_bool(cs: &ConstraintSystemRef<Fr>, b: State) -> Result<(), Synthe
 
 #[cfg(test)]
 mod tests {
-    use super::enforce_bool;
-
     use ark_bls12_381::Fr;
     use ark_ff::{AdditiveGroup, Field, UniformRand};
     use ark_relations::r1cs::ConstraintSystem;
     use ark_std::test_rng;
-
     use hash_preimage::sponge::gadget::State;
+
+    use super::enforce_bool;
 
     #[test]
     fn bool_allows_zero() {

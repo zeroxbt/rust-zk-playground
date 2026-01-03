@@ -185,11 +185,11 @@ pub fn scalar_mul(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::curve::native;
-    use crate::curve::spec::Point;
     use ark_ff::AdditiveGroup;
     use ark_relations::r1cs::ConstraintSystem;
+
+    use super::*;
+    use crate::curve::{native, spec::Point};
 
     // ============================================================
     // HELPER

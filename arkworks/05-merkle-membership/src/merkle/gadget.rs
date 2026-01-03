@@ -1,4 +1,5 @@
 use ark_bls12_381::Fr;
+use ark_ff::Field;
 use ark_relations::r1cs::{ConstraintSystemRef, LinearCombination, SynthesisError, Variable};
 use hash_preimage::{
     poseidon::native::PoseidonPermutation,
@@ -6,7 +7,6 @@ use hash_preimage::{
 };
 
 use crate::merkle::spec::MERKLE_NODE_DST;
-use ark_ff::Field;
 
 pub fn compute_root<const T: usize>(
     cs: &ConstraintSystemRef<Fr>,
@@ -74,11 +74,12 @@ pub fn conditional_swap(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::{AdditiveGroup, UniformRand};
     use ark_relations::r1cs::ConstraintSystem;
     use ark_std::test_rng;
+
+    use super::*;
 
     #[test]
     fn conditional_swap_b0_yields_left_cur_right_sib() {

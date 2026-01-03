@@ -61,10 +61,10 @@ fn mul_by_cofactor_8(p: &Point) -> Point {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::curve::native::scalar_mul;
-    use crate::curve::spec::Point;
     use ark_ff::{AdditiveGroup, Field};
+
+    use super::*;
+    use crate::curve::{native::scalar_mul, spec::Point};
 
     // ============================================================
     // HELPER FUNCTIONS

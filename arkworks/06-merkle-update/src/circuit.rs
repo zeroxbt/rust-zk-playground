@@ -7,7 +7,6 @@ use hash_preimage::{
     poseidon::native::PoseidonPermutation,
     sponge::gadget::{SpongeGadget, State},
 };
-
 use merkle_membership::merkle::{gadget::compute_root, spec::DEPTH};
 
 pub struct MerkleUpdateCircuit {
@@ -86,21 +85,18 @@ impl ConstraintSynthesizer<Fr> for MerkleUpdateCircuit {
 
 #[cfg(test)]
 mod tests {
-    use super::MerkleUpdateCircuit;
-
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::{AdditiveGroup, Field, UniformRand};
     use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
     use ark_std::test_rng;
-    use rand::RngCore;
-
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
-
     // Reuse the native Merkle root from project 04
     use merkle_membership::merkle::native;
-
     use merkle_membership::merkle::spec::DEPTH;
+    use rand::RngCore;
+
+    use super::MerkleUpdateCircuit;
 
     fn random_witness() -> (Fr, Fr, [Fr; DEPTH], [Fr; DEPTH]) {
         let mut rng = test_rng();
@@ -362,7 +358,8 @@ mod tests {
 
         let new_root_wrong = compute_root_native(new_leaf, &path2, &bits2);
 
-        // Circuit uses (path,bits) for both roots, but we give a new_root computed from (path2,bits2)
+        // Circuit uses (path,bits) for both roots, but we give a new_root computed from
+        // (path2,bits2)
         let circuit = MerkleUpdateCircuit {
             old_leaf: Some(old_leaf),
             new_leaf: Some(new_leaf),

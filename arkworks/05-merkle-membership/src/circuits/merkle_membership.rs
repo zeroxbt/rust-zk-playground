@@ -64,17 +64,15 @@ impl ConstraintSynthesizer<Fr> for MerkleMembershipCircuit {
 
 #[cfg(test)]
 mod tests {
-    use super::MerkleMembershipCircuit;
-
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::{AdditiveGroup, Field, UniformRand};
     use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
     use ark_std::test_rng;
-
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
     use rand::RngCore;
 
+    use super::MerkleMembershipCircuit;
     use crate::merkle::{native, spec::DEPTH};
 
     fn random_witness() -> (Fr, [Fr; DEPTH], [Fr; DEPTH]) {

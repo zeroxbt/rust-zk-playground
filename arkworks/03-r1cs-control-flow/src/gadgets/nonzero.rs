@@ -16,11 +16,12 @@ pub fn enforce_nonzero(cs: &ConstraintSystemRef<Fr>, x: State) -> Result<(), Syn
 
 #[cfg(test)]
 mod enforce_nonzero_tests {
-    use super::*;
-    use crate::gadgets::nonzero::enforce_nonzero;
     use ark_bls12_381::Fr;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
     use hash_preimage::sponge::gadget::State;
+
+    use super::*;
+    use crate::gadgets::nonzero::enforce_nonzero;
 
     fn w(cs: &ConstraintSystemRef<Fr>, v: Fr) -> State {
         State::witness(cs, v).unwrap()

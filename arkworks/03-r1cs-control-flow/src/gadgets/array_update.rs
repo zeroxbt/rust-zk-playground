@@ -27,12 +27,12 @@ pub fn update_one_slot<const T: usize>(
 
 #[cfg(test)]
 mod array_update_tests {
-    use super::*;
-    use crate::gadgets::array_update::update_one_slot;
-    use crate::gadgets::one_hot::enforce_one_hot;
     use ark_bls12_381::Fr;
     use ark_ff::AdditiveGroup;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef, LinearCombination, Variable};
+
+    use super::*;
+    use crate::gadgets::{array_update::update_one_slot, one_hot::enforce_one_hot};
 
     fn witness_array<const T: usize>(cs: &ConstraintSystemRef<Fr>, vals: [u64; T]) -> [State; T] {
         let frs: Vec<Fr> = vals.into_iter().map(Fr::from).collect();

@@ -43,10 +43,11 @@ impl<const T: usize> ConstraintSynthesizer<Fr> for ArrayUpdateCircuit<T> {
 
 #[cfg(test)]
 mod array_update_tests {
-    use crate::circuits::array_update::ArrayUpdateCircuit;
     use ark_bls12_381::Fr;
     use ark_ff::{AdditiveGroup, Field};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
+
+    use crate::circuits::array_update::ArrayUpdateCircuit;
 
     fn mux_poly(b: Fr, x: Fr, y: Fr) -> Fr {
         y + b * (x - y)

@@ -18,10 +18,11 @@ pub fn enforce_neq(cs: &ConstraintSystemRef<Fr>, a: State, b: State) -> Result<(
 
 #[cfg(test)]
 mod neq_tests {
-    use crate::gadgets::neq::enforce_neq;
     use ark_bls12_381::Fr;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
     use hash_preimage::sponge::gadget::State;
+
+    use crate::gadgets::neq::enforce_neq;
 
     fn w(cs: &ConstraintSystemRef<Fr>, v: u64) -> State {
         State::witness(cs, Fr::from(v)).unwrap()

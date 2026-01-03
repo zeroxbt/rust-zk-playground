@@ -27,10 +27,11 @@ impl<F: Field> ConstraintSynthesizer<F> for MulCircuit<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::MulCircuit;
-    use crate::{Curve, Fr};
     use ark_groth16::{Groth16, prepare_verifying_key};
     use ark_std::test_rng;
+
+    use super::MulCircuit;
+    use crate::{Curve, Fr};
 
     fn prove(
         a: u64,

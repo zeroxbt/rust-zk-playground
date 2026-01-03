@@ -55,10 +55,11 @@ impl<const T: usize> ConstraintSynthesizer<Fr> for FirstDifferenceCircuit<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_groth16::prepare_verifying_key;
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
+
+    use super::*;
 
     // Helper to convert u64 arrays to Fr arrays
     fn to_fr_array<const T: usize>(vals: [u64; T]) -> [Fr; T] {

@@ -1,9 +1,10 @@
+use ark_bls12_381::Fr;
+use ark_ff::{AdditiveGroup, Field};
+
 use crate::{
     poseidon::spec::{POSEIDON_SPEC, PoseidonSpec},
     sponge::native::PermutationNative,
 };
-use ark_bls12_381::Fr;
-use ark_ff::{AdditiveGroup, Field};
 
 pub struct PoseidonPermutation<'a> {
     spec: &'a PoseidonSpec,
@@ -81,17 +82,16 @@ fn apply_mds(spec: &PoseidonSpec, state: &mut [Fr; 3]) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        poseidon::spec::{CAPACITY, POSEIDON_SPEC, RATE},
-        sponge::native::SpongeNative,
-    };
-
-    use super::*;
-
     use ark_bls12_381::Fr;
     use ark_crypto_primitives::sponge::{
         CryptographicSponge,
         poseidon::{PoseidonConfig, PoseidonSponge},
+    };
+
+    use super::*;
+    use crate::{
+        poseidon::spec::{CAPACITY, POSEIDON_SPEC, RATE},
+        sponge::native::SpongeNative,
     };
 
     fn poseidon_config_from_spec(spec: &PoseidonSpec) -> PoseidonConfig<Fr> {

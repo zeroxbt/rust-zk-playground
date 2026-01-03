@@ -13,14 +13,14 @@ use crate::{
 };
 
 pub struct NullifierCircuit<const T: usize> {
-    /* Witnesses */
+    // Witnesses
     secret: Option<Fr>,
     balance: Option<Fr>,
     salt: Option<Fr>,
     nonce: Option<Fr>,
     index_bits: Option<[Fr; T]>,
     path: Option<[Fr; T]>,
-    /* Public inputs */
+    // Public inputs
     root: Option<Fr>,
     nullifier: Option<Fr>,
 }

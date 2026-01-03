@@ -73,10 +73,11 @@ pub fn first_difference_selectors<const T: usize>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::Field;
     use ark_relations::r1cs::ConstraintSystem;
+
+    use super::*;
 
     // Helper to create a State from a value in the constraint system
     fn state_from_value(cs: &ConstraintSystemRef<Fr>, val: Fr) -> State {

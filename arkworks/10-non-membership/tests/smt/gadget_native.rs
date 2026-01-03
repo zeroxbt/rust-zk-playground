@@ -2,12 +2,11 @@ use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, Field};
 use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 use hash_preimage::sponge::gadget::State;
-use rand::{Rng, thread_rng};
-
 use non_membership::smt::{
     gadget::verify_non_membership, native::verify_non_membership as native_verify,
     spec::SmtNonMembershipProofVar, tree::SparseMerkleTree,
 };
+use rand::{Rng, thread_rng};
 
 const TEST_DEPTH: usize = 16;
 

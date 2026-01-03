@@ -1,11 +1,12 @@
-use crate::{
-    sponge::gadget::{SpongeGadget, State},
-    toy_hash::native::ToyHashPermutation,
-};
 use ark_bls12_381::Fr;
 use ark_ff::AdditiveGroup;
 use ark_relations::r1cs::{
     ConstraintSynthesizer, ConstraintSystemRef, LinearCombination, SynthesisError, Variable,
+};
+
+use crate::{
+    sponge::gadget::{SpongeGadget, State},
+    toy_hash::native::ToyHashPermutation,
 };
 
 #[derive(Clone, Debug)]
@@ -60,14 +61,13 @@ impl ConstraintSynthesizer<Fr> for ToyHashCircuit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{sponge::native::SpongeNative, toy_hash::native::ToyHashPermutation};
-
-    use super::*;
     use ark_bls12_381::Bls12_381;
     use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
-
     use ark_relations::r1cs::ConstraintSystem;
     use ark_std::test_rng;
+
+    use super::*;
+    use crate::{sponge::native::SpongeNative, toy_hash::native::ToyHashPermutation};
 
     fn create_circuits() -> (ToyHashCircuit, ToyHashCircuit) {
         let x0 = Fr::from(7u64);

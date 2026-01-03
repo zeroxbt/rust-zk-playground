@@ -122,13 +122,14 @@ pub fn enforce_old_root<const T: usize>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::gadget::{enforce_one_hot, first_difference_selectors};
     use ark_bls12_381::Fr;
     use ark_ff::Field;
     use ark_relations::r1cs::ConstraintSystem;
     use hash_preimage::{poseidon::native::PoseidonPermutation, sponge::native::SpongeNative};
     use merkle_membership::merkle::spec::MERKLE_NODE_DST;
+
+    use super::*;
+    use crate::gadget::{enforce_one_hot, first_difference_selectors};
 
     // ========================================================================
     // TEST DATA GENERATION HELPERS

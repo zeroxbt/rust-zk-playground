@@ -35,10 +35,11 @@ impl ConstraintSynthesizer<Fr> for SelectCircuit {
 
 #[cfg(test)]
 mod select_circuit_tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::{AdditiveGroup, Field};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
+
+    use super::*;
 
     fn mux_poly(b: Fr, x: Fr, y: Fr) -> Fr {
         y + b * (x - y)

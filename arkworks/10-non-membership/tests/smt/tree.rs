@@ -1,8 +1,7 @@
 use ark_bls12_381::Fr;
 use ark_ff::{AdditiveGroup, UniformRand};
-use rand::thread_rng;
-
 use non_membership::smt::{spec::index_bits, tree::SparseMerkleTree};
+use rand::thread_rng;
 
 const TEST_DEPTH: usize = 16;
 

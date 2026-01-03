@@ -1,8 +1,7 @@
 use ark_bls12_381::Fr;
 use ark_ff::UniformRand;
-use rand::thread_rng;
-
 use non_membership::smt::{native::verify_non_membership, tree::SparseMerkleTree};
+use rand::thread_rng;
 
 const TEST_DEPTH: usize = 16;
 

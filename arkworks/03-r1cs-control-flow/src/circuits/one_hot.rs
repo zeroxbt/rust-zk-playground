@@ -25,10 +25,11 @@ impl<const T: usize> ConstraintSynthesizer<Fr> for OneHotCircuit<T> {
 
 #[cfg(test)]
 mod one_hot_circuit_tests {
-    use super::*;
     use ark_bls12_381::Fr;
     use ark_ff::{AdditiveGroup, Field};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
+
+    use super::*;
 
     fn run<const T: usize>(c: OneHotCircuit<T>) -> ark_relations::r1cs::ConstraintSystemRef<Fr> {
         let cs = ConstraintSystem::<Fr>::new_ref();

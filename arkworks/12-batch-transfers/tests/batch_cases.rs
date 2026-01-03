@@ -1,6 +1,5 @@
 use ark_bls12_381::Fr;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
-
 use batch_transfers::circuit::BatchTransferCircuit;
 
 mod common;

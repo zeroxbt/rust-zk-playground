@@ -58,8 +58,9 @@ impl Point {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ark_ff::Field;
+
+    use super::*;
 
     // ============================================================
     // PARAMETER TESTS

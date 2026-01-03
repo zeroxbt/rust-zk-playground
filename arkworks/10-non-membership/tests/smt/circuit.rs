@@ -3,7 +3,6 @@ use ark_ff::AdditiveGroup;
 use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, prepare_verifying_key};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
 use ark_std::test_rng;
-
 use non_membership::smt::{circuit::NonMembershipCircuit, tree::SparseMerkleTree};
 
 const TEST_DEPTH: usize = 16;
