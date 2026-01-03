@@ -75,7 +75,7 @@ impl<const N: usize, const D: usize> ConstraintSynthesizer<Fr> for BatchTransfer
     }
 }
 
-fn transfer<const D: usize>(
+pub fn transfer<const D: usize>(
     cs: &ConstraintSystemRef<Fr>,
     tx_var: &mut TransferStepVar<D>,
     root_in: State,

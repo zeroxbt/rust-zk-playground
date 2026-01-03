@@ -5,7 +5,7 @@ use hash_preimage::sponge::gadget::State;
 
 use crate::{
     curve::{gadget::PointVar, spec::Point},
-    eddsa::gadget::verify,
+    eddsa::{gadget::verify, spec::SignatureVar},
 };
 
 pub struct EddsaVerificationCircuit {
@@ -25,7 +25,7 @@ impl ConstraintSynthesizer<Fr> for EddsaVerificationCircuit {
         let msg = State::input(&cs, self.msg.unwrap_or_default())?;
         let s: [State; 256] = State::input_array(&cs, &self.s.unwrap_or([Fr::ZERO; 256]))?;
 
-        verify(&cs, &pk, msg, &s, &r)
+        verify(&cs, &pk, msg, &SignatureVar::new(r, s))
     }
 }
 

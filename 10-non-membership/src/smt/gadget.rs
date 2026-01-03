@@ -7,7 +7,7 @@ use hash_preimage::{
 };
 use merkle_membership::merkle::gadget::compute_root;
 
-use crate::smt::spec::{DEFAULT_LEAF, SmtNonMembershipProofVar, index_bits};
+use crate::smt::spec::{DEFAULT_LEAF, NULLIFIER_MARKER, SmtNonMembershipProofVar, index_bits};
 
 pub fn verify_non_membership<const D: usize>(
     cs: &ConstraintSystemRef<Fr>,
@@ -19,13 +19,43 @@ pub fn verify_non_membership<const D: usize>(
     cs.enforce_constraint(
         LinearCombination::from(default_leaf.var()),
         LinearCombination::from(Variable::One),
-        LinearCombination::zero(),
+        LinearCombination::from((DEFAULT_LEAF, Variable::One)),
     )?;
 
     let computed_root = compute_root(
         cs,
         &SpongeGadget::<PoseidonPermutation, 3, 2>::default(),
         default_leaf,
+        proof.path(),
+        &index_bits,
+    )?;
+
+    cs.enforce_constraint(
+        LinearCombination::from(computed_root.var()),
+        LinearCombination::from(Variable::One),
+        LinearCombination::from(root.var()),
+    )?;
+
+    Ok(())
+}
+
+pub fn verify_membership<const D: usize>(
+    cs: &ConstraintSystemRef<Fr>,
+    root: State,
+    proof: &SmtNonMembershipProofVar<D>,
+) -> Result<(), SynthesisError> {
+    let index_bits = nullifier_to_index_bits(cs, proof.nullifier())?;
+    let marker_leaf = State::witness(cs, NULLIFIER_MARKER)?;
+    cs.enforce_constraint(
+        LinearCombination::from(marker_leaf.var()),
+        LinearCombination::from(Variable::One),
+        LinearCombination::from((NULLIFIER_MARKER, Variable::One)),
+    )?;
+
+    let computed_root = compute_root(
+        cs,
+        &SpongeGadget::<PoseidonPermutation, 3, 2>::default(),
+        marker_leaf,
         proof.path(),
         &index_bits,
     )?;

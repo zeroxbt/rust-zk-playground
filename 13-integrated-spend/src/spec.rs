@@ -1,6 +1,10 @@
+use ark_bls12_381::Fr;
+use ark_ff::MontFp;
 use batch_transfers::spec::{TransferStep, TransferStepVar};
 use non_membership::smt::spec::{SmtNonMembershipProof, SmtNonMembershipProofVar};
 use signatures::eddsa::spec::{Signature, SignatureVar};
+
+pub const SPEND_HASH_DST: Fr = MontFp!("701");
 
 pub struct SpendTransaction<const D: usize> {
     transfer: TransferStep<D>,
@@ -55,6 +59,10 @@ impl<const D: usize> SpendTransactionVar<D> {
 
     pub fn transfer(&self) -> &TransferStepVar<D> {
         &self.transfer
+    }
+
+    pub fn transfer_mut(&mut self) -> &mut TransferStepVar<D> {
+        &mut self.transfer
     }
 
     pub fn signature(&self) -> &SignatureVar {
