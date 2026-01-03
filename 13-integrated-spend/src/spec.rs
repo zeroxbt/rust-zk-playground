@@ -6,6 +6,7 @@ use signatures::eddsa::spec::{Signature, SignatureVar};
 
 pub const SPEND_HASH_DST: Fr = MontFp!("701");
 
+#[derive(Clone)]
 pub struct SpendTransaction<const D: usize> {
     transfer: TransferStep<D>,
     signature: Signature,
