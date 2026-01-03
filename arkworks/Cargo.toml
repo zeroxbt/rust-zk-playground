@@ -15,3 +15,27 @@ members = [
     "13-integrated-spend",
 ]
 resolver = "2"
+
+[workspace.package]
+edition = "2024"
+
+[workspace.dependencies]
+ark-std = "0.5.0"
+ark-ff = "0.5.0"
+ark-ec = "0.5.0"
+ark-relations = "0.5.1"
+ark-groth16 = "0.5.0"
+ark-bls12-381 = "0.5.0"
+ark-crypto-primitives = "0.5.0"
+rand = "0.8"
+rand_core = "0.6"
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
+
+hash-preimage = { path = "04-hash-preimage" }
+merkle-membership = { path = "05-merkle-membership" }
+merkle-transfer-kernel = { path = "08-merkle-transfer-kernel" }
+nullifiers = { path = "09-nullifiers" }
+signatures = { path = "11-signatures" }
+non-membership = { path = "10-non-membership" }
+batch-transfers = { path = "12-batch-transfers" }

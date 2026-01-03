@@ -1,16 +1,17 @@
 [package]
 name = "nullifiers"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+
 
 [dependencies]
-ark-ff = "0.5.0"
-ark-relations = "0.5.1"
-ark-bls12-381 = "0.5.0"
-hash-preimage = { path = "../04-hash-preimage" }
-merkle-membership = { path = "../05-merkle-membership" }
+ark-ff.workspace = true
+ark-relations.workspace = true
+ark-bls12-381.workspace = true
+hash-preimage.workspace = true
+merkle-membership.workspace = true
 
 [dev-dependencies]
-rand = "0.8"
-rand_core = "0.6"
-ark-std = "0.5.0"
+rand.workspace = true
+rand_core.workspace = true
+ark-std.workspace = true
