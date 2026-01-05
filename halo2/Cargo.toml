@@ -1,0 +1,7 @@
+[workspace]
+members = ["01-arithmetic"]
+resolver = "2"
+
+[workspace.package]
+rust-version = "1.83.0"
+edition = "2024"
